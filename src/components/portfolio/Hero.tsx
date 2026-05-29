@@ -567,7 +567,7 @@ function runHeroCommand(cmd: string): string[] {
 
 const QUICK_CMDS = ["whoami", "skills", "projects", "resume", "sudo hire-me"];
 
-type TLine = { type: "in" | "out" | "muted"; text: string };
+type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: string };
 
 function HeroTerminal() {
   const intro: TLine[] = [
