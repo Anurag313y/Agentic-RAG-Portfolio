@@ -10,9 +10,6 @@ export function Footer() {
           <span className="text-foreground">{PROFILE.name}</span>{" "}
           <span className="text-muted-foreground">— © {new Date().getFullYear()}</span>
         </div>
-        <div className="text-xs text-muted-foreground font-mono">
-          built with React · TypeScript · Tailwind · framer-motion
-        </div>
         <div className="flex items-center gap-2">
           {[
             { icon: Github, href: PROFILE.socials.github, label: "GitHub" },
