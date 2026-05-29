@@ -233,9 +233,10 @@ export function Hero() {
             </a>
           </div>
 
-          {/* Secondary: terminal CTA — feels like a feature, not nav */}
-          <a
-            href="#terminal"
+          {/* Secondary: switch hero-right to terminal mode */}
+          <button
+            type="button"
+            onClick={() => setMode("terminal")}
             className="mt-6 inline-flex items-center gap-3 px-4 py-2.5 rounded-lg font-mono text-xs glass glass-hover group"
           >
             <TerminalSquare className="size-4 text-cyan" />
@@ -243,7 +244,7 @@ export function Hero() {
               <span className="text-emerald">$</span> Access Linux Environment
             </span>
             <span className="text-cyan opacity-70 group-hover:opacity-100 transition-opacity">→</span>
-          </a>
+          </button>
 
           <div className="mt-8 grid grid-cols-3 max-w-md gap-3 font-mono">
             {[
