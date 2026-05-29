@@ -277,10 +277,10 @@ export function Hero() {
                 </div>
                 <div className="leading-tight">
                   <div className="text-sm font-semibold tracking-wide">
-                    {mode === "jarvis" ? "J.A.R.V.I.S" : "tty/anurag"}
+                    {mode === "jarvis" ? "J.A.R.V.I.S" : "$ cat /portfolio/terminal.md"}
                   </div>
                   <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    {mode === "jarvis" ? "portfolio assistant" : "linux command line"}
+                    {mode === "jarvis" ? "portfolio assistant" : "interactive shell"}
                   </div>
                 </div>
               </div>
@@ -563,6 +563,15 @@ function runHeroCommand(cmd: string): string[] {
     return ["[sudo] authenticating recruiter...", "✓ access granted.", "redirecting to contact ↓"];
   if (c === "clear") return ["__CLEAR__"];
   if (c === "ls") return ["about  skills  projects  experience  resume  contact"];
+  if (c.startsWith("cd ")) {
+    const target = c.slice(3).trim();
+    const valid = ["about", "skills", "projects", "experience", "resume", "contact"];
+    if (valid.includes(target)) {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
+      return [`→ navigating to /${target}`];
+    }
+    return [`cd: no such section: ${target}`];
+  }
   return [`command not found: ${cmd}. try 'help'`];
 }
 
@@ -572,19 +581,10 @@ type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: s
 
 function HeroTerminal() {
   const intro: TLine[] = [
-    { type: "in", text: "cat /portfolio/terminal.md" },
-    { type: "muted", text: "// developer console" },
-    { type: "heading", text: "Terminal Environment" },
-    {
-      type: "muted",
-      text: "A live shell wired to my portfolio. Prefer keys over clicks? Type a command or pick a chip.",
-    },
-    { type: "out", text: "" },
-    { type: "kv", text: "session   · anurag@portfolio (secure · read-only)" },
-    { type: "kv", text: "shell     · zsh 5.9  ·  tty/anurag" },
-    { type: "kv", text: "uptime    · online · available for work" },
-    { type: "out", text: "" },
-    { type: "hint", text: "↳ try 'help' to list commands, or 'sudo hire-me' to start a conversation." },
+    { type: "in", text: "cd welcome" },
+    { type: "out", text: `Hi, I'm ${PROFILE.name}, a ${PROFILE.role}.` },
+    { type: "out", text: "Welcome to my interactive portfolio terminal." },
+    { type: "hint", text: "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact)." },
   ];
   const [lines, setLines] = useState<TLine[]>(intro);
   const [input, setInput] = useState("");
