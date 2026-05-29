@@ -10,7 +10,7 @@ export function Resume() {
         <SectionHeading
           id="resume"
           eyebrow="// resume"
-          title="Resume \n"
+          title="Resume"
           description="Skim the highlights or download the full PDF."
         />
         <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6 justify-between">

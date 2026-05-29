@@ -10,7 +10,7 @@ export function Projects() {
         <SectionHeading
           id="projects"
           eyebrow="// projects"
-          title="Selected Work"
+          title="Projects"
           description="A snapshot of systems I've designed and shipped. Every one of these was built to be maintained."
         />
         <div className="grid md:grid-cols-2 gap-6">

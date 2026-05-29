@@ -11,7 +11,7 @@ function sanitize(s: string) {
 export function Contact() {
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
 
   const copy = async () => {
     await navigator.clipboard.writeText(PROFILE.email);
@@ -24,8 +24,9 @@ export function Contact() {
     e.preventDefault();
     const name = sanitize(form.name);
     const email = sanitize(form.email);
+    const subject = sanitize(form.subject);
     const message = sanitize(form.message);
-    if (!name || !email || !message) {
+    if (!name || !email || !subject || !message) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -35,7 +36,7 @@ export function Contact() {
     }
     setSent(true);
     toast.success("Message queued — I'll get back to you soon.");
-    setForm({ name: "", email: "", message: "" });
+    setForm({ name: "", email: "", subject: "", message: "" });
     setTimeout(() => setSent(false), 4000);
   };
 
@@ -46,7 +47,7 @@ export function Contact() {
           id="contact"
           eyebrow="// contact"
           title="Let's build something"
-          description="Open to senior engineering roles, freelance, and interesting collaborations."
+          description="Open to impactful roles, freelance work, and meaningful products."
         />
         <div className="grid lg:grid-cols-[1fr_1.2fr] gap-6">
           <div className="space-y-4">
@@ -125,6 +126,17 @@ export function Contact() {
               </label>
             </div>
             <label className="block">
+              <div className="text-xs font-mono text-muted-foreground mb-1.5">subject</div>
+              <input
+                value={form.subject}
+                onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                maxLength={160}
+                required
+                className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2.5 text-sm"
+                placeholder="Project inquiry, role, collaboration…"
+              />
+            </label>
+            <label className="block">
               <div className="text-xs font-mono text-muted-foreground mb-1.5">message</div>
               <textarea
                 value={form.message}
@@ -136,6 +148,9 @@ export function Contact() {
                 placeholder="Tell me about your project, role, or idea…"
               />
             </label>
+            <div className="font-mono text-[11px] text-muted-foreground">
+              // Protected by spam filters and rate limits
+            </div>
             <button
               type="submit"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan text-primary-foreground font-medium hover:bg-cyan-glow transition-colors glow-cyan"

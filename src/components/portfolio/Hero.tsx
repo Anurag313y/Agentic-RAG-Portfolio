@@ -276,12 +276,14 @@ export function Hero() {
                   <Cpu className="size-4 text-cyan" />
                 </div>
                 <div className="leading-tight">
-                  <div className="text-sm font-semibold tracking-wide">
+                  <div className={`text-sm font-semibold tracking-wide ${mode === "terminal" ? "font-mono text-cyan" : ""}`}>
                     {mode === "jarvis" ? "J.A.R.V.I.S" : "$ cat /portfolio/terminal.md"}
                   </div>
-                  <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                    {mode === "jarvis" ? "portfolio assistant" : "interactive shell"}
-                  </div>
+                  {mode === "jarvis" && (
+                    <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                      portfolio assistant
+                    </div>
+                  )}
                 </div>
               </div>
 
