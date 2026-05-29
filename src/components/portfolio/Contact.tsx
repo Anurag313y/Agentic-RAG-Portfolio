@@ -46,7 +46,7 @@ export function Contact() {
           id="contact"
           eyebrow="// contact"
           title="Let's build something"
-          description="Open to senior engineering roles, freelance, and interesting collaborations."
+          description="Open to impactful roles, freelance work, and meaningful products."
         />
         <div className="grid lg:grid-cols-[1fr_1.2fr] gap-6">
           <div className="space-y-4">
