@@ -5,7 +5,7 @@ import { Briefcase } from "lucide-react";
 
 export function Experience() {
   return (
-    <section id="experience" className="py-24">
+    <section id="experience" className="py-16">
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeading
           id="experience"

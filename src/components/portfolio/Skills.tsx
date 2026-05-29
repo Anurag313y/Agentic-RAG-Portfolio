@@ -16,7 +16,7 @@ const ICONS: Record<string, any> = {
 
 export function Skills() {
   return (
-    <section id="skills" className="py-24 relative">
+    <section id="skills" className="py-16 relative">
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeading
           id="skills"

@@ -40,7 +40,7 @@ export function Contact() {
   };
 
   return (
-    <section id="contact" className="py-24">
+    <section id="contact" className="py-16">
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeading
           id="contact"
