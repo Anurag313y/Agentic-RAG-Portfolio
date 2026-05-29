@@ -573,17 +573,11 @@ type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: s
 function HeroTerminal() {
   const intro: TLine[] = [
     { type: "in", text: "cat /portfolio/terminal.md" },
-    { type: "muted", text: "// DEVELOPER CONSOLE · v1.0.4" },
-    { type: "heading", text: "Linux Command Line" },
+    { type: "muted", text: "// developer console" },
+    { type: "heading", text: "Terminal Environment" },
     {
       type: "muted",
-      text:
-        "A live shell wired straight into my portfolio — every section, project, and link is one command away.",
-    },
-    {
-      type: "muted",
-      text:
-        "Prefer keys over clicks? Type a command or pick a chip below. Tab-friendly, recruiter-friendly.",
+      text: "A live shell wired to my portfolio. Prefer keys over clicks? Type a command or pick a chip.",
     },
     { type: "out", text: "" },
     { type: "kv", text: "session   · anurag@portfolio (secure · read-only)" },
