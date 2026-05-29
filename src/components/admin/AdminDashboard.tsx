@@ -15,6 +15,9 @@ import {
   Upload,
   RotateCcw,
   Cpu,
+  Menu,
+  X,
+  Key,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -25,7 +28,7 @@ import {
   type Content,
 } from "@/lib/admin-store";
 
-type Tab = "profile" | "about" | "projects" | "skills" | "experience" | "resume" | "social";
+type Tab = "profile" | "about" | "projects" | "skills" | "experience" | "resume" | "social" | "api";
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "profile", label: "Profile & Contact", icon: User },
@@ -35,11 +38,13 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "experience", label: "Experience", icon: Briefcase },
   { id: "resume", label: "Resume", icon: Upload },
   { id: "social", label: "Social Links", icon: Link2 },
+  { id: "api", label: "API Configuration", icon: Key },
 ];
 
 export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [content, setContent] = useState<Content>(() => loadContent());
   const [tab, setTab] = useState<Tab>("profile");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const persist = (next: Content) => {
     setContent(next);
@@ -52,27 +57,41 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     onLogout();
   };
 
+  const selectTab = (t: Tab) => {
+    setTab(t);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="min-h-screen relative">
       <div className="absolute inset-0 grid-bg pointer-events-none opacity-50" />
-      <div className="relative mx-auto max-w-7xl px-4 py-6">
+      <div className="relative mx-auto max-w-7xl px-3 sm:px-4 py-4 sm:py-6">
         {/* Top bar */}
-        <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="size-8 rounded-md bg-cyan/15 border border-cyan/40 grid place-items-center">
-              <Cpu className="size-4 text-cyan" />
+        <div className="glass rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between mb-4 sm:mb-6 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Mobile sidebar toggle */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden size-8 grid place-items-center rounded-md border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              {sidebarOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+            </button>
+            <div className="size-7 sm:size-8 rounded-md bg-cyan/15 border border-cyan/40 grid place-items-center">
+              <Cpu className="size-3.5 sm:size-4 text-cyan" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <div className="text-sm font-semibold">Admin Console</div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 portfolio content
               </div>
             </div>
+            <div className="sm:hidden text-sm font-semibold">Admin</div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <Link
               to="/"
-              className="text-xs px-3 py-1.5 rounded-md glass glass-hover font-mono"
+              className="text-xs px-2 sm:px-3 py-1.5 rounded-md glass glass-hover font-mono hidden sm:inline-flex"
             >
               view site
             </Link>
@@ -82,29 +101,57 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 setContent(loadContent());
                 toast.success("Reset to defaults");
               }}
-              className="text-xs px-3 py-1.5 rounded-md border border-border hover:border-cyan/40 font-mono inline-flex items-center gap-1.5"
+              className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-border hover:border-cyan/40 font-mono inline-flex items-center gap-1 sm:gap-1.5"
             >
-              <RotateCcw className="size-3.5" /> reset
+              <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">reset</span>
             </button>
             <button
               onClick={logout}
-              className="text-xs px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 font-mono inline-flex items-center gap-1.5"
+              className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 font-mono inline-flex items-center gap-1 sm:gap-1.5"
             >
-              <LogOut className="size-3.5" /> logout
+              <LogOut className="size-3.5" /> <span className="hidden sm:inline">logout</span>
             </button>
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[220px_1fr] gap-6">
-          {/* Sidebar */}
-          <aside className="glass rounded-2xl p-3 h-fit">
+        <div className="grid lg:grid-cols-[240px_1fr] gap-4 sm:gap-6 items-start">
+          {/* Sidebar — mobile overlay / desktop static */}
+          {/* Mobile overlay backdrop */}
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <aside
+            className={`
+              lg:relative lg:translate-x-0 lg:opacity-100 lg:block
+              fixed top-0 left-0 z-50 h-full w-[260px] lg:w-full
+              glass rounded-none lg:rounded-2xl p-3 lg:h-fit
+              transition-all duration-300 ease-out
+              ${sidebarOpen
+                ? "translate-x-0 opacity-100"
+                : "-translate-x-full opacity-0 lg:translate-x-0 lg:opacity-100"
+              }
+            `}
+          >
+            {/* Mobile close button inside sidebar */}
+            <div className="lg:hidden flex items-center justify-between p-2 mb-2 border-b border-border/60">
+              <span className="font-mono text-xs text-muted-foreground">Navigation</span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="size-7 grid place-items-center rounded-md hover:text-cyan"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
             {TABS.map((t) => {
               const Icon = t.icon;
               const active = tab === t.id;
               return (
                 <button
                   key={t.id}
-                  onClick={() => setTab(t.id)}
+                  onClick={() => selectTab(t.id)}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     active
                       ? "bg-cyan/15 text-cyan border border-cyan/40"
@@ -116,10 +163,19 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </button>
               );
             })}
+            {/* Mobile-only view site link */}
+            <div className="lg:hidden mt-3 pt-3 border-t border-border/60">
+              <Link
+                to="/"
+                className="block text-center text-xs px-3 py-2 rounded-md glass glass-hover font-mono"
+              >
+                view site
+              </Link>
+            </div>
           </aside>
 
           {/* Panel */}
-          <main className="glass rounded-2xl p-6 min-h-[500px]">
+          <main className="glass rounded-2xl p-4 sm:p-6 min-h-[400px] sm:min-h-[500px]">
             {tab === "profile" && <ProfilePanel content={content} onSave={persist} />}
             {tab === "about" && <AboutPanel content={content} onSave={persist} />}
             {tab === "projects" && <ProjectsPanel content={content} onSave={persist} />}
@@ -127,6 +183,7 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {tab === "experience" && <ExperiencePanel content={content} onSave={persist} />}
             {tab === "resume" && <ResumePanel content={content} onSave={persist} />}
             {tab === "social" && <SocialPanel content={content} onSave={persist} />}
+            {tab === "api" && <ApiPanel content={content} onSave={persist} />}
           </main>
         </div>
       </div>
@@ -176,7 +233,7 @@ function SaveBar({ onSave }: { onSave: () => void }) {
     <div className="mt-6 flex justify-end">
       <button
         onClick={onSave}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow"
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
       >
         <Save className="size-4" /> Save changes
       </button>
@@ -186,8 +243,8 @@ function SaveBar({ onSave }: { onSave: () => void }) {
 
 function PanelHeader({ title, desc }: { title: string; desc?: string }) {
   return (
-    <div className="mb-5">
-      <h2 className="text-xl font-semibold">{title}</h2>
+    <div className="mb-4 sm:mb-5">
+      <h2 className="text-lg sm:text-xl font-semibold">{title}</h2>
       {desc && <p className="text-sm text-muted-foreground mt-1">{desc}</p>}
     </div>
   );
@@ -197,17 +254,69 @@ function PanelHeader({ title, desc }: { title: string; desc?: string }) {
 
 function ProfilePanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
   const [p, setP] = useState(content.profile);
+
+  const handleFileChange = (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (PNG, JPG, WEBP, etc.)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) {
+        setP((prev) => ({ ...prev, photoUrl: result }));
+        toast.success("Photo loaded — click Save to apply");
+      }
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read image file");
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div>
       <PanelHeader title="Profile & Contact" desc="Public-facing identity shown across the portfolio." />
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
         <Field label="name" value={p.name} onChange={(v) => setP({ ...p, name: v })} />
         <Field label="role" value={p.role} onChange={(v) => setP({ ...p, role: v })} />
         <Field label="handle" value={p.handle} onChange={(v) => setP({ ...p, handle: v })} />
         <Field label="location" value={p.location} onChange={(v) => setP({ ...p, location: v })} />
         <Field label="email" value={p.email} onChange={(v) => setP({ ...p, email: v })} type="email" />
+        <Field label="photo url" value={p.photoUrl || ""} onChange={(v) => setP({ ...p, photoUrl: v })} />
       </div>
-      <div className="mt-4 grid gap-4">
+      <div className="mt-4 grid sm:grid-cols-[1fr_2fr] gap-4">
+        <div className="rounded-xl border border-dashed border-cyan/30 p-4 text-center bg-background/30 flex flex-col justify-center items-center">
+          <Upload className="size-5 text-cyan mb-2" />
+          <p className="text-xs text-muted-foreground">Upload profile photo</p>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+            className="mt-2 text-[10px] text-muted-foreground w-full file:mr-2 file:px-2 file:py-1 file:rounded file:border file:border-cyan/40 file:bg-cyan/10 file:text-cyan file:font-mono file:cursor-pointer"
+          />
+        </div>
+        <div className="flex items-center gap-4 p-3 rounded-xl border border-border/60 bg-background/20">
+          <div className="size-16 rounded-lg overflow-hidden border border-border/80 shrink-0 bg-background">
+            <img
+              src={p.photoUrl || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80"}
+              alt="Preview"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80";
+              }}
+            />
+          </div>
+          <div className="text-xs text-muted-foreground font-mono min-w-0">
+            <div className="text-cyan font-semibold">Photo Preview</div>
+            <div className="mt-1 text-[10px] break-all truncate">
+              {p.photoUrl?.startsWith("data:") ? "Uploaded Image (Base64)" : (p.photoUrl || "Default Avatar")}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 sm:mt-4 grid gap-3 sm:gap-4">
         <Field label="headline" value={p.headline} onChange={(v) => setP({ ...p, headline: v })} textarea />
         <Field label="intro" value={p.intro} onChange={(v) => setP({ ...p, intro: v })} textarea />
       </div>
@@ -245,22 +354,22 @@ function ProjectsPanel({ content, onSave }: { content: Content; onSave: (c: Cont
       <PanelHeader title="Projects" desc="Add, edit, hide, or remove projects." />
       <div className="space-y-4">
         {items.map((p, i) => (
-          <div key={i} className="rounded-xl border border-border/70 p-4 bg-background/30">
-            <div className="flex items-center justify-between mb-3">
+          <div key={i} className="rounded-xl border border-border/70 p-3 sm:p-4 bg-background/30">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
               <span className="font-mono text-xs text-muted-foreground">#{i + 1}</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => update(i, { hidden: !p.hidden })}
-                  className="text-xs px-2 py-1 rounded-md border border-border hover:border-cyan/40 inline-flex items-center gap-1.5"
+                  className="text-xs px-2 py-1 rounded-md border border-border hover:border-cyan/40 inline-flex items-center gap-1 sm:gap-1.5"
                 >
                   {p.hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                  {p.hidden ? "hidden" : "visible"}
+                  <span className="hidden sm:inline">{p.hidden ? "hidden" : "visible"}</span>
                 </button>
                 <button
                   onClick={() => remove(i)}
-                  className="text-xs px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1.5"
+                  className="text-xs px-2 py-1 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1 sm:gap-1.5"
                 >
-                  <Trash2 className="size-3.5" /> remove
+                  <Trash2 className="size-3.5" /> <span className="hidden sm:inline">remove</span>
                 </button>
               </div>
             </div>
@@ -292,16 +401,16 @@ function ProjectsPanel({ content, onSave }: { content: Content; onSave: (c: Cont
           </div>
         ))}
       </div>
-      <div className="mt-4 flex justify-between">
+      <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
         <button
           onClick={add}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
         >
           <Plus className="size-4" /> Add project
         </button>
         <button
           onClick={() => onSave({ ...content, projects: items })}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
         >
           <Save className="size-4" /> Save changes
         </button>
@@ -323,34 +432,36 @@ function SkillsPanel({ content, onSave }: { content: Content; onSave: (c: Conten
       <PanelHeader title="Skills" desc="Group skills by category." />
       <div className="space-y-3">
         {items.map((s, i) => (
-          <div key={i} className="rounded-xl border border-border/70 p-4 bg-background/30">
-            <div className="grid sm:grid-cols-[1fr_2fr_auto] gap-3 items-end">
+          <div key={i} className="rounded-xl border border-border/70 p-3 sm:p-4 bg-background/30">
+            <div className="grid sm:grid-cols-[1fr_2fr] gap-3 items-end">
               <Field label="category" value={s.category} onChange={(v) => update(i, { category: v })} />
               <Field
                 label="items (comma separated)"
                 value={s.items.join(", ")}
                 onChange={(v) => update(i, { items: v.split(",").map((x) => x.trim()).filter(Boolean) })}
               />
+            </div>
+            <div className="mt-2 flex justify-end">
               <button
                 onClick={() => remove(i)}
-                className="h-[42px] px-3 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1.5 text-sm"
+                className="px-2 sm:px-3 py-1.5 rounded-lg border border-destructive/40 text-destructive hover:bg-destructive/10 inline-flex items-center gap-1.5 text-xs sm:text-sm"
               >
-                <Trash2 className="size-4" />
+                <Trash2 className="size-3.5 sm:size-4" /> <span className="hidden sm:inline">Remove</span>
               </button>
             </div>
           </div>
         ))}
       </div>
-      <div className="mt-4 flex justify-between">
+      <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
         <button
           onClick={add}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
         >
           <Plus className="size-4" /> Add category
         </button>
         <button
           onClick={() => onSave({ ...content, skills: items })}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
         >
           <Save className="size-4" /> Save changes
         </button>
@@ -373,7 +484,7 @@ function ExperiencePanel({ content, onSave }: { content: Content; onSave: (c: Co
       <PanelHeader title="Work Experience" desc="Roles, durations, and key wins." />
       <div className="space-y-3">
         {items.map((e, i) => (
-          <div key={i} className="rounded-xl border border-border/70 p-4 bg-background/30">
+          <div key={i} className="rounded-xl border border-border/70 p-3 sm:p-4 bg-background/30">
             <div className="grid sm:grid-cols-3 gap-3">
               <Field label="company" value={e.company} onChange={(v) => update(i, { company: v })} />
               <Field label="role" value={e.role} onChange={(v) => update(i, { role: v })} />
@@ -398,16 +509,16 @@ function ExperiencePanel({ content, onSave }: { content: Content; onSave: (c: Co
           </div>
         ))}
       </div>
-      <div className="mt-4 flex justify-between">
+      <div className="mt-4 flex flex-col sm:flex-row justify-between gap-2">
         <button
           onClick={add}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm"
         >
           <Plus className="size-4" /> Add role
         </button>
         <button
           onClick={() => onSave({ ...content, experience: items })}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow"
+          className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
         >
           <Save className="size-4" /> Save changes
         </button>
@@ -434,14 +545,14 @@ function ResumePanel({ content, onSave }: { content: Content; onSave: (c: Conten
   return (
     <div>
       <PanelHeader title="Resume" desc="Replace the PDF that the resume section serves." />
-      <div className="rounded-xl border border-dashed border-cyan/30 p-8 text-center bg-background/30">
-        <Upload className="size-7 text-cyan mx-auto mb-3" />
+      <div className="rounded-xl border border-dashed border-cyan/30 p-6 sm:p-8 text-center bg-background/30">
+        <Upload className="size-6 sm:size-7 text-cyan mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">Drag & drop a PDF, or pick a file.</p>
         <input
           type="file"
           accept="application/pdf"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-          className="mt-3 mx-auto block text-xs text-muted-foreground file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border file:border-cyan/40 file:bg-cyan/10 file:text-cyan file:font-mono"
+          className="mt-3 mx-auto block text-xs text-muted-foreground file:mr-2 sm:file:mr-3 file:px-2 sm:file:px-3 file:py-1.5 file:rounded-md file:border file:border-cyan/40 file:bg-cyan/10 file:text-cyan file:font-mono"
         />
       </div>
       <div className="mt-4">
@@ -459,7 +570,7 @@ function SocialPanel({ content, onSave }: { content: Content; onSave: (c: Conten
   return (
     <div>
       <PanelHeader title="Social Links" desc="GitHub, LinkedIn, Instagram, Twitter, Email." />
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
         <Field label="email" value={email} onChange={setEmail} />
         <Field label="github" value={s.github} onChange={(v) => setS({ ...s, github: v })} />
         <Field label="linkedin" value={s.linkedin} onChange={(v) => setS({ ...s, linkedin: v })} />

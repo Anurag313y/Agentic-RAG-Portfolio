@@ -191,9 +191,9 @@ export function Hero() {
   );
 
   return (
-    <section id="home" className="relative min-h-[100svh] pt-28 pb-12 overflow-hidden">
+    <section id="home" className="relative min-h-[100svh] pt-24 sm:pt-28 pb-8 sm:pb-12 overflow-hidden">
       <div className="absolute inset-0 grid-bg pointer-events-none" />
-      <div className="mx-auto max-w-7xl px-4 grid lg:grid-cols-[1fr_1.05fr] gap-10 items-center">
+      <div className="mx-auto max-w-7xl px-3 sm:px-4 grid lg:grid-cols-[1fr_1.05fr] gap-8 lg:gap-10 items-center">
         {/* LEFT — identity */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -204,30 +204,30 @@ export function Hero() {
             <span className="size-2 rounded-full bg-emerald animate-pulse" />
             online · available for work
           </div>
-          <h1 className="mt-5 text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
+          <h1 className="mt-4 sm:mt-5 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
             <span className="block text-foreground">{PROFILE.name}</span>
             <span className="block text-gradient">{PROFILE.role}</span>
           </h1>
-          <p className="mt-5 text-lg text-foreground/85 max-w-xl">{PROFILE.headline}</p>
+          <p className="mt-4 sm:mt-5 text-base sm:text-lg text-foreground/85 max-w-xl">{PROFILE.headline}</p>
           <p className="mt-2 text-sm text-muted-foreground max-w-xl">{PROFILE.intro}</p>
 
-          <div className="mt-7 flex flex-wrap gap-3">
+          <div className="mt-5 sm:mt-7 flex flex-wrap gap-2 sm:gap-3">
             <a
               href="#projects"
-              className="group inline-flex items-center gap-2 px-5 py-3 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow transition-all"
+              className="group inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow transition-all text-sm sm:text-base"
             >
               View Projects
               <ArrowRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
             </a>
             <a
               href="#resume"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-lg glass glass-hover font-medium"
+              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg glass glass-hover font-medium text-sm sm:text-base"
             >
               <Download className="size-4" /> View Resume
             </a>
             <a
               href="#contact"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border border-emerald/40 text-emerald hover:bg-emerald/10 transition-colors font-medium"
+              className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-lg border border-emerald/40 text-emerald hover:bg-emerald/10 transition-colors font-medium text-sm sm:text-base"
             >
               <Mail className="size-4" /> Contact Me
             </a>
@@ -237,7 +237,7 @@ export function Hero() {
           <button
             type="button"
             onClick={() => setMode("terminal")}
-            className="mt-6 inline-flex items-center gap-3 px-4 py-2.5 rounded-lg font-mono text-xs glass glass-hover group"
+            className="mt-5 sm:mt-6 inline-flex items-center gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-mono text-xs glass glass-hover group"
           >
             <TerminalSquare className="size-4 text-cyan" />
             <span className="text-muted-foreground">
@@ -246,15 +246,15 @@ export function Hero() {
             <span className="text-cyan opacity-70 group-hover:opacity-100 transition-opacity">→</span>
           </button>
 
-          <div className="mt-8 grid grid-cols-3 max-w-md gap-3 font-mono">
+          <div className="mt-6 sm:mt-8 grid grid-cols-3 max-w-md gap-2 sm:gap-3 font-mono">
             {[
-              { k: "5+", v: "years" },
+              { k: "1+", v: "years" },
               { k: "30+", v: "projects" },
               { k: "99.9%", v: "uptime" },
             ].map((s) => (
-              <div key={s.v} className="glass rounded-xl p-3 text-center">
-                <div className="text-xl text-cyan font-semibold">{s.k}</div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{s.v}</div>
+              <div key={s.v} className="glass rounded-xl p-2.5 sm:p-3 text-center">
+                <div className="text-lg sm:text-xl text-cyan font-semibold">{s.k}</div>
+                <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-muted-foreground">{s.v}</div>
               </div>
             ))}
           </div>
@@ -265,23 +265,27 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
-          className="relative"
+          className="relative w-full min-h-[600px] sm:min-h-[680px]"
         >
           {/* Borderless hero-right: top toolbar floats over a hologram surface */}
-          <div className="relative">
+          <div className="relative min-h-full flex flex-col">
             {/* Top floating toolbar */}
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2.5">
-                <div className="size-8 rounded-md bg-cyan/15 border border-cyan/40 grid place-items-center glow-cyan">
-                  <Cpu className="size-4 text-cyan" />
+            <div className="flex items-center justify-between mb-4 sm:mb-5 gap-2">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                <div className="size-7 sm:size-8 rounded-md bg-cyan/15 border border-cyan/40 grid place-items-center glow-cyan shrink-0">
+                  <Cpu className="size-3.5 sm:size-4 text-cyan" />
                 </div>
-                <div className="leading-tight">
-                  <div className={`text-sm font-semibold tracking-wide ${mode === "terminal" ? "font-mono text-cyan" : ""}`}>
-                    {mode === "jarvis" ? "J.A.R.V.I.S" : "$ cat /portfolio/terminal.md"}
-                  </div>
-                  {mode === "jarvis" && (
-                    <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                      portfolio assistant
+                <div className="leading-tight min-w-0">
+                  {mode === "jarvis" ? (
+                    <>
+                      <div className="text-sm font-semibold tracking-wide">J.A.R.V.I.S</div>
+                      <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                        portfolio assistant
+                      </div>
+                    </>
+                  ) : (
+                    <div className="font-mono text-xs text-cyan truncate">
+                      <span className="text-emerald">$</span> cat /portfolio/terminal.md
                     </div>
                   )}
                 </div>
@@ -291,33 +295,33 @@ export function Hero() {
               <div
                 role="tablist"
                 aria-label="hero panel mode"
-                className="relative inline-flex p-1 rounded-full font-mono text-[11px] bg-background/40 backdrop-blur border border-cyan/20"
+                className="relative inline-flex p-0.5 sm:p-1 rounded-full font-mono text-[10px] sm:text-[11px] bg-background/40 backdrop-blur border border-cyan/20 shrink-0"
               >
                 <span
                   aria-hidden
-                  className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-cyan/15 border border-cyan/40 transition-all duration-300 ease-out ${
-                    mode === "jarvis" ? "left-1" : "left-[calc(50%+0px)]"
+                  className={`absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 w-[calc(50%-4px)] rounded-full bg-cyan/15 border border-cyan/40 transition-all duration-300 ease-out ${
+                    mode === "jarvis" ? "left-0.5 sm:left-1" : "left-[calc(50%+0px)]"
                   }`}
                 />
                 <button
                   role="tab"
                   aria-selected={mode === "jarvis"}
                   onClick={() => setMode("jarvis")}
-                  className={`relative z-10 px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-colors ${
+                  className={`relative z-10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${
                     mode === "jarvis" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Cpu className="size-3" /> J.A.R.V.I.S
+                  <Cpu className="size-3" /> <span className="hidden xs:inline">J.A.R.V.I.S</span><span className="xs:hidden">AI</span>
                 </button>
                 <button
                   role="tab"
                   aria-selected={mode === "terminal"}
                   onClick={() => setMode("terminal")}
-                  className={`relative z-10 px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 transition-colors ${
+                  className={`relative z-10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${
                     mode === "terminal" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <TerminalSquare className="size-3" /> Linux Terminal
+                  <TerminalSquare className="size-3" /> <span className="hidden xs:inline">Linux Terminal</span><span className="xs:hidden">CLI</span>
                 </button>
               </div>
             </div>
@@ -330,7 +334,7 @@ export function Hero() {
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
                   transition={{ duration: 0.35, ease: "easeOut" }}
-                  className="relative"
+                  className="relative flex-1"
                 >
                   {/* Voice toggle (floating, no card) */}
                   <div className="flex items-center justify-end mb-2">
@@ -351,7 +355,7 @@ export function Hero() {
                   </div>
 
                   {/* Hologram core */}
-                  <div className="relative aspect-square max-w-[440px] mx-auto">
+                  <div className="relative aspect-square max-w-[210px] xs:max-w-[250px] sm:max-w-[440px] mx-auto">
                     {/* Ambient glow */}
                     <div className="absolute inset-0 rounded-full bg-cyan/10 blur-3xl" />
                     <div className="absolute inset-[12%] rounded-full bg-emerald/10 blur-2xl" />
@@ -398,16 +402,16 @@ export function Hero() {
                       />
 
                       {/* Micro HUD chips */}
-                      <div className="absolute top-2 left-2 font-mono text-[9px] text-cyan/70 tracking-widest">
+                      <div className="absolute top-2 left-2 font-mono text-[8px] sm:text-[9px] text-cyan/70 tracking-widest">
                         SYS · 0x4A1F
                       </div>
-                      <div className="absolute top-2 right-2 font-mono text-[9px] text-emerald/80 tracking-widest">
+                      <div className="absolute top-2 right-2 font-mono text-[8px] sm:text-[9px] text-emerald/80 tracking-widest">
                         ◉ LINK OK
                       </div>
-                      <div className="absolute bottom-2 left-2 font-mono text-[9px] text-cyan/60 tracking-widest">
+                      <div className="absolute bottom-2 left-2 font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest">
                         FREQ 21.4kHz
                       </div>
-                      <div className="absolute bottom-2 right-2 font-mono text-[9px] text-cyan/60 tracking-widest">
+                      <div className="absolute bottom-2 right-2 font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest">
                         CORE · STABLE
                       </div>
 
@@ -435,13 +439,13 @@ export function Hero() {
                   </div>
 
                   {/* Status */}
-                  <div className="flex items-center justify-center gap-2 mt-2 font-mono text-[11px] uppercase tracking-widest">
+                  <div className="flex items-center justify-center gap-2 mt-2 font-mono text-[10px] sm:text-[11px] uppercase tracking-widest">
                     <span className={`size-1.5 rounded-full ${statusMeta.dot} ${state !== "ready" ? "animate-pulse" : ""}`} />
                     <span className="text-muted-foreground">{statusMeta.label}</span>
                   </div>
 
                   {/* Transcript / response — borderless, just a soft surface */}
-                  <div className="mt-3 font-mono text-sm min-h-[92px] px-1">
+                  <div className="mt-3 font-mono text-xs sm:text-sm min-h-[80px] sm:min-h-[92px] px-1">
                     <AnimatePresence mode="wait">
                       {transcript && (
                         <motion.div
@@ -493,12 +497,12 @@ export function Hero() {
                   </div>
 
                   {/* Suggestions */}
-                  <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                  <div className="mt-3 flex flex-wrap gap-1.5 sm:gap-2 justify-center">
                     {SUGGESTIONS.map((s) => (
                       <button
                         key={s}
                         onClick={() => handleQuery(s)}
-                        className="text-[11px] px-2.5 py-1 rounded-full border border-cyan/20 text-muted-foreground hover:text-cyan hover:border-cyan/50 transition-colors font-mono bg-background/30 backdrop-blur"
+                        className="text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-1 rounded-full border border-cyan/20 text-muted-foreground hover:text-cyan hover:border-cyan/50 transition-colors font-mono bg-background/30 backdrop-blur"
                       >
                         {s}
                       </button>
@@ -512,6 +516,7 @@ export function Hero() {
                   animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
                   exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
                   transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="relative flex-1 flex flex-col"
                 >
                   <HeroTerminal />
                 </motion.div>
@@ -581,22 +586,61 @@ const QUICK_CMDS = ["whoami", "skills", "projects", "resume", "sudo hire-me"];
 
 type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: string };
 
+// Welcome lines for typing animation
+const WELCOME_LINES = [
+  `Hi, I'm ${PROFILE.name}, a ${PROFILE.role}.`,
+  "Welcome to my interactive portfolio terminal.",
+  "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact).",
+];
+
 function HeroTerminal() {
-  const intro: TLine[] = [
-    { type: "in", text: "cd welcome" },
-    { type: "out", text: `Hi, I'm ${PROFILE.name}, a ${PROFILE.role}.` },
-    { type: "out", text: "Welcome to my interactive portfolio terminal." },
-    { type: "hint", text: "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact)." },
-  ];
-  const [lines, setLines] = useState<TLine[]>(intro);
+  const [lines, setLines] = useState<TLine[]>([{ type: "in", text: "cd welcome" }]);
   const [input, setInput] = useState("");
+  const [typingLineIndex, setTypingLineIndex] = useState(0);
+  const [typingCharIndex, setTypingCharIndex] = useState(0);
+  const [introComplete, setIntroComplete] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Typing animation for welcome text
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-    inputRef.current?.focus();
-  }, [lines]);
+    if (introComplete) return;
+    if (typingLineIndex >= WELCOME_LINES.length) {
+      setIntroComplete(true);
+      return;
+    }
+
+    const currentLine = WELCOME_LINES[typingLineIndex];
+    if (typingCharIndex < currentLine.length) {
+      const timeout = setTimeout(() => {
+        setTypingCharIndex((prev) => prev + 1);
+      }, 22);
+      return () => clearTimeout(timeout);
+    } else {
+      // Finished current line, move to next after a small pause
+      const timeout = setTimeout(() => {
+        setTypingLineIndex((prev) => prev + 1);
+        setTypingCharIndex(0);
+      }, 200);
+      return () => clearTimeout(timeout);
+    }
+  }, [typingLineIndex, typingCharIndex, introComplete]);
+
+  // Scroll ONLY the terminal container, not the page
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [lines, typingCharIndex]);
+
+  // Focus input after intro is complete
+  useEffect(() => {
+    if (introComplete) {
+      // Use preventScroll to stop the browser from jumping down to the input
+      inputRef.current?.focus({ preventScroll: true });
+    }
+  }, [introComplete]);
 
   const submit = (cmd: string) => {
     const out = runHeroCommand(cmd);
@@ -618,24 +662,27 @@ function HeroTerminal() {
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden scanline bg-background/40 backdrop-blur-md ring-1 ring-cyan/15"
-      onClick={() => inputRef.current?.focus()}
+      className="relative rounded-2xl overflow-hidden scanline bg-background/40 backdrop-blur-md ring-1 ring-cyan/15 flex flex-col h-full"
+      onClick={() => introComplete && inputRef.current?.focus({ preventScroll: true })}
     >
       {/* Title bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-cyan/15 bg-background/30">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 border-b border-cyan/15 bg-background/30 shrink-0">
         <div className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-destructive/80" />
-          <span className="size-2.5 rounded-full bg-yellow-500/80" />
-          <span className="size-2.5 rounded-full bg-emerald/80" />
+          <span className="size-2 sm:size-2.5 rounded-full bg-destructive/80" />
+          <span className="size-2 sm:size-2.5 rounded-full bg-yellow-500/80" />
+          <span className="size-2 sm:size-2.5 rounded-full bg-emerald/80" />
         </div>
-        <span className="font-mono text-[11px] text-muted-foreground">
+        <span className="font-mono text-[10px] sm:text-[11px] text-muted-foreground">
           {PROFILE.handle}: ~/portfolio
         </span>
-        <span className="font-mono text-[10px] text-emerald">● live</span>
+        <span className="font-mono text-[9px] sm:text-[10px] text-emerald">● live</span>
       </div>
 
       {/* Screen */}
-      <div className="font-mono text-[13px] p-4 sm:p-5 h-[420px] overflow-y-auto leading-relaxed">
+      <div
+        ref={scrollContainerRef}
+        className="font-mono text-xs sm:text-[13px] p-3 sm:p-4 md:p-5 flex-1 overflow-y-auto leading-relaxed"
+      >
         {lines.map((l, i) => {
           if (l.type === "in") {
             return (
@@ -683,36 +730,89 @@ function HeroTerminal() {
             </div>
           );
         })}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit(input);
-            setInput("");
-          }}
-          className="flex items-center gap-2 mt-1"
-        >
-          <span className="text-emerald">{PROFILE.handle}</span>
-          <span className="text-muted-foreground">:~$</span>
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            aria-label="terminal input"
-            className="flex-1 bg-transparent outline-none text-foreground caret-cyan"
-          />
-        </form>
+
+        {/* Typing animation for welcome text */}
+        {!introComplete && (
+          <>
+            {Array.from({ length: typingLineIndex + 1 }).map((_, i) => {
+              if (i >= WELCOME_LINES.length) return null;
+              const isCurrentLine = i === typingLineIndex;
+              const displayText = isCurrentLine
+                ? WELCOME_LINES[i].slice(0, typingCharIndex)
+                : i < typingLineIndex
+                  ? WELCOME_LINES[i]
+                  : "";
+              if (!displayText) return null;
+
+              const lineType = i === 2 ? "hint" : "out";
+              return (
+                <div
+                  key={`typing-${i}`}
+                  className={
+                    lineType === "hint"
+                      ? "pl-1 text-emerald/80 italic"
+                      : "text-foreground/85 whitespace-pre-wrap pl-1"
+                  }
+                >
+                  {displayText}
+                  {isCurrentLine && <span className="caret">▍</span>}
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {/* Show the static welcome text after intro is complete */}
+        {introComplete && lines.length <= 1 && (
+          <>
+            <div className="text-foreground/85 whitespace-pre-wrap pl-1">
+              {WELCOME_LINES[0]}
+            </div>
+            <div className="text-foreground/85 whitespace-pre-wrap pl-1">
+              {WELCOME_LINES[1]}
+            </div>
+            <div className="pl-1 text-emerald/80 italic">
+              {WELCOME_LINES[2]}
+            </div>
+          </>
+        )}
+
+        {introComplete && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(input);
+              setInput("");
+            }}
+            className="flex items-center gap-2 mt-1"
+          >
+            <span className="text-emerald">{PROFILE.handle}</span>
+            <span className="text-muted-foreground">:~$</span>
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              aria-label="terminal input"
+              className="flex-1 bg-transparent outline-none text-foreground caret-cyan min-w-0"
+            />
+          </form>
+        )}
         <div ref={endRef} />
       </div>
 
       {/* Quick chips */}
-      <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-cyan/15 bg-background/30">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-cyan/15 bg-background/30 shrink-0">
         {QUICK_CMDS.map((q) => (
           <button
             key={q}
-            onClick={() => submit(q)}
-            className="font-mono text-[11px] px-2.5 py-1 rounded-md border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
+            onClick={() => {
+              if (!introComplete) return;
+              submit(q);
+            }}
+            disabled={!introComplete}
+            className="font-mono text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-1 rounded-md border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors disabled:opacity-40"
           >
             {q}
           </button>

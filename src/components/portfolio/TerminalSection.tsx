@@ -60,11 +60,14 @@ export function TerminalSection() {
     { type: "out", text: `Welcome to ${PROFILE.handle} — type 'help' to begin.` },
   ]);
   const [input, setInput] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Scroll only the terminal container, not the page
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [lines]);
 
   const submit = (cmd: string) => {
@@ -86,8 +89,8 @@ export function TerminalSection() {
   };
 
   return (
-    <section id="terminal" className="py-16 relative">
-      <div className="mx-auto max-w-7xl px-4">
+    <section id="terminal" className="py-12 sm:py-16 relative">
+      <div className="mx-auto max-w-7xl px-3 sm:px-4">
         <SectionHeading
           id="terminal"
           eyebrow="// developer console"
@@ -99,19 +102,22 @@ export function TerminalSection() {
           className="glass rounded-2xl overflow-hidden scanline relative"
           onClick={() => inputRef.current?.focus()}
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+          <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-border/60">
             <div className="flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-destructive/80" />
-              <span className="size-3 rounded-full bg-yellow-500/80" />
-              <span className="size-3 rounded-full bg-emerald/80" />
+              <span className="size-2.5 sm:size-3 rounded-full bg-destructive/80" />
+              <span className="size-2.5 sm:size-3 rounded-full bg-yellow-500/80" />
+              <span className="size-2.5 sm:size-3 rounded-full bg-emerald/80" />
             </div>
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="font-mono text-[10px] sm:text-xs text-muted-foreground">
               {PROFILE.handle}: ~/portfolio
             </span>
-            <span className="font-mono text-[10px] text-emerald">● live</span>
+            <span className="font-mono text-[9px] sm:text-[10px] text-emerald">● live</span>
           </div>
 
-          <div className="font-mono text-sm p-4 sm:p-6 h-[420px] overflow-y-auto">
+          <div
+            ref={scrollContainerRef}
+            className="font-mono text-xs sm:text-sm p-3 sm:p-4 md:p-6 h-[340px] sm:h-[420px] overflow-y-auto"
+          >
             {lines.map((l, i) =>
               l.type === "in" ? (
                 <div key={i}>
@@ -142,18 +148,17 @@ export function TerminalSection() {
                 spellCheck={false}
                 autoComplete="off"
                 aria-label="terminal input"
-                className="flex-1 bg-transparent outline-none text-foreground caret-cyan"
+                className="flex-1 bg-transparent outline-none text-foreground caret-cyan min-w-0"
               />
             </form>
-            <div ref={endRef} />
           </div>
 
-          <div className="flex flex-wrap gap-2 px-4 py-3 border-t border-border/60">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-border/60">
             {QUICK.map((q) => (
               <button
                 key={q}
                 onClick={() => submit(q)}
-                className="font-mono text-xs px-2.5 py-1 rounded-md border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
+                className="font-mono text-[10px] sm:text-xs px-2 sm:px-2.5 py-1 rounded-md border border-cyan/30 text-cyan hover:bg-cyan/10 transition-colors"
               >
                 {q}
               </button>
@@ -163,4 +168,4 @@ export function TerminalSection() {
       </div>
     </section>
   );
-}
+}

@@ -12,6 +12,9 @@ export type Content = {
   experience: typeof EXPERIENCE;
   about: string;
   resumeUrl: string;
+  geminiApiKey?: string;
+  cohereApiKey?: string;
+  primaryModel?: "gemini" | "cohere" | "static";
 };
 
 const DEFAULTS: Content = {
@@ -22,6 +25,9 @@ const DEFAULTS: Content = {
   about:
     "Software engineer focused on performance, developer experience, and clean systems design.",
   resumeUrl: PROFILE.resumeUrl,
+  geminiApiKey: "",
+  cohereApiKey: "",
+  primaryModel: "static",
 };
 
 export function loadContent(): Content {

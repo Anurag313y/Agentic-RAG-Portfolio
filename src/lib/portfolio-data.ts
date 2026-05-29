@@ -8,6 +8,7 @@ export const PROFILE = {
   location: "India · Remote",
   email: "hello@anuragyadav.dev",
   resumeUrl: "/resume.pdf",
+  photoUrl: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80",
   socials: {
     github: "https://github.com/anuragyadav",
     linkedin: "https://linkedin.com/in/anuragyadav",
