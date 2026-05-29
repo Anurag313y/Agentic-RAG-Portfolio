@@ -86,13 +86,13 @@ export function TerminalSection() {
   };
 
   return (
-    <section id="terminal" className="py-24 relative">
+    <section id="terminal" className="py-16 relative">
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeading
           id="terminal"
-          eyebrow="// shell"
-          title="Interactive Terminal"
-          description="A live shell wired to my portfolio. Type a command or click a chip below."
+          eyebrow="// developer console"
+          title="Linux Command Line"
+          description="A live shell wired to my portfolio. Prefer keys over clicks? Type a command or pick a chip."
         />
 
         <div

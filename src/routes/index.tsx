@@ -7,7 +7,6 @@ import { Skills } from "@/components/portfolio/Skills";
 import { Projects } from "@/components/portfolio/Projects";
 import { Experience } from "@/components/portfolio/Experience";
 import { Resume } from "@/components/portfolio/Resume";
-import { Assistant } from "@/components/portfolio/Assistant";
 import { Contact } from "@/components/portfolio/Contact";
 import { Footer } from "@/components/portfolio/Footer";
 import { Toaster } from "@/components/ui/sonner";
@@ -30,13 +29,12 @@ function Index() {
       <NavBar />
       <main>
         <Hero />
-        <TerminalSection />
         <About />
         <Skills />
         <Projects />
         <Experience />
         <Resume />
-        <Assistant />
+        <TerminalSection />
         <Contact />
       </main>
       <Footer />
