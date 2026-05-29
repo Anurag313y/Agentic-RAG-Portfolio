@@ -563,6 +563,15 @@ function runHeroCommand(cmd: string): string[] {
     return ["[sudo] authenticating recruiter...", "✓ access granted.", "redirecting to contact ↓"];
   if (c === "clear") return ["__CLEAR__"];
   if (c === "ls") return ["about  skills  projects  experience  resume  contact"];
+  if (c.startsWith("cd ")) {
+    const target = c.slice(3).trim();
+    const valid = ["about", "skills", "projects", "experience", "resume", "contact"];
+    if (valid.includes(target)) {
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
+      return [`→ navigating to /${target}`];
+    }
+    return [`cd: no such section: ${target}`];
+  }
   return [`command not found: ${cmd}. try 'help'`];
 }
 
