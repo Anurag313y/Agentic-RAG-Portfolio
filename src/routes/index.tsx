@@ -1,29 +1,46 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { NavBar } from "@/components/portfolio/NavBar";
+import { Hero } from "@/components/portfolio/Hero";
+import { TerminalSection } from "@/components/portfolio/TerminalSection";
+import { About } from "@/components/portfolio/About";
+import { Skills } from "@/components/portfolio/Skills";
+import { Projects } from "@/components/portfolio/Projects";
+import { Experience } from "@/components/portfolio/Experience";
+import { Resume } from "@/components/portfolio/Resume";
+import { Assistant } from "@/components/portfolio/Assistant";
+import { Contact } from "@/components/portfolio/Contact";
+import { Footer } from "@/components/portfolio/Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Anurag Yadav — Software Engineer" },
+      { name: "description", content: "Futuristic portfolio of Anurag Yadav — Software Engineer building fast, reliable, and elegant software." },
+      { property: "og:title", content: "Anurag Yadav — Software Engineer" },
+      { property: "og:description", content: "Linux-native full-stack engineer. Projects, experience, and an interactive terminal." },
     ],
   }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen">
+      <NavBar />
+      <main>
+        <Hero />
+        <TerminalSection />
+        <About />
+        <Skills />
+        <Projects />
+        <Experience />
+        <Resume />
+        <Assistant />
+        <Contact />
+      </main>
+      <Footer />
+      <Toaster theme="dark" position="bottom-right" />
     </div>
   );
 }
