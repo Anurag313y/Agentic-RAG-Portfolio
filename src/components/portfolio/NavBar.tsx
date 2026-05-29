@@ -3,12 +3,12 @@ import { Terminal } from "lucide-react";
 
 const LINKS = [
   { id: "home", label: "~/home" },
-  { id: "terminal", label: "~/terminal" },
   { id: "about", label: "~/about" },
   { id: "skills", label: "~/skills" },
   { id: "projects", label: "~/projects" },
   { id: "experience", label: "~/experience" },
   { id: "resume", label: "~/resume" },
+  { id: "terminal", label: "~/console" },
   { id: "contact", label: "~/contact" },
 ];
 

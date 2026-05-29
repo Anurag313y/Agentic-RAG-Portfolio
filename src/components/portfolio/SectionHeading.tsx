@@ -17,7 +17,7 @@ export function SectionHeading({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-80px" }}
       transition={{ duration: 0.5 }}
-      className="max-w-2xl mb-12"
+      className="max-w-2xl mb-10"
     >
       <div className="font-mono text-xs text-cyan mb-3">
         <span className="text-emerald">$</span> cat /portfolio/{id}.md

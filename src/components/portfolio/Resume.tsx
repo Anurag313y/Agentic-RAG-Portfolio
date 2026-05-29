@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader } from 
 
 export function Resume() {
   return (
-    <section id="resume" className="py-24">
+    <section id="resume" className="py-16">
       <div className="mx-auto max-w-7xl px-4">
         <SectionHeading
           id="resume"
