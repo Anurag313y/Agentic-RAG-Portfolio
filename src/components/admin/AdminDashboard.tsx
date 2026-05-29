@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -20,13 +21,14 @@ import {
   Key,
 } from "lucide-react";
 import { toast } from "sonner";
+import { adminLogout } from "@/lib/api/auth.functions";
 import {
-  loadContent,
-  saveContent,
-  resetContent,
-  setAdminSession,
-  type Content,
-} from "@/lib/admin-store";
+  getAdminContent,
+  resetPortfolioContent,
+  updatePortfolioContent,
+} from "@/lib/api/portfolio.functions";
+import type { AdminContent } from "@/lib/admin-store";
+import { PORTFOLIO_QUERY_KEY } from "@/lib/content.types";
 
 type Tab = "profile" | "about" | "projects" | "skills" | "experience" | "resume" | "social" | "api";
 
@@ -41,19 +43,37 @@ const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "api", label: "API Configuration", icon: Key },
 ];
 
-export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const [content, setContent] = useState<Content>(() => loadContent());
+export function AdminDashboard({
+  initialContent,
+  onLogout,
+}: {
+  initialContent: AdminContent;
+  onLogout: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [content, setContent] = useState<AdminContent>(initialContent);
   const [tab, setTab] = useState<Tab>("profile");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const persist = (next: Content) => {
+  const persist = async (next: AdminContent) => {
     setContent(next);
-    saveContent(next);
-    toast.success("Saved");
+    setSaving(true);
+    try {
+      await updatePortfolioContent({ data: next });
+      await queryClient.invalidateQueries({ queryKey: PORTFOLIO_QUERY_KEY });
+      toast.success("Saved");
+    } catch {
+      toast.error("Failed to save");
+      const fresh = await getAdminContent();
+      setContent(fresh);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const logout = () => {
-    setAdminSession(false);
+  const logout = async () => {
+    await adminLogout();
     onLogout();
   };
 
@@ -96,12 +116,22 @@ export function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               view site
             </Link>
             <button
-              onClick={() => {
-                resetContent();
-                setContent(loadContent());
-                toast.success("Reset to defaults");
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await resetPortfolioContent();
+                  await queryClient.invalidateQueries({ queryKey: PORTFOLIO_QUERY_KEY });
+                  const fresh = await getAdminContent();
+                  setContent(fresh);
+                  toast.success("Reset to defaults");
+                } catch {
+                  toast.error("Failed to reset");
+                } finally {
+                  setSaving(false);
+                }
               }}
-              className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-border hover:border-cyan/40 font-mono inline-flex items-center gap-1 sm:gap-1.5"
+              disabled={saving}
+              className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-border hover:border-cyan/40 font-mono inline-flex items-center gap-1 sm:gap-1.5 disabled:opacity-60"
             >
               <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">reset</span>
             </button>
@@ -252,7 +282,7 @@ function PanelHeader({ title, desc }: { title: string; desc?: string }) {
 
 // ---------- Panels ----------
 
-function ProfilePanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function ProfilePanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [p, setP] = useState(content.profile);
 
   const handleFileChange = (file: File | null) => {
@@ -325,7 +355,7 @@ function ProfilePanel({ content, onSave }: { content: Content; onSave: (c: Conte
   );
 }
 
-function AboutPanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function AboutPanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [about, setAbout] = useState(content.about);
   return (
     <div>
@@ -336,7 +366,7 @@ function AboutPanel({ content, onSave }: { content: Content; onSave: (c: Content
   );
 }
 
-function ProjectsPanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function ProjectsPanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [items, setItems] = useState(content.projects);
 
   const update = (i: number, patch: Partial<(typeof items)[number]>) => {
@@ -419,7 +449,7 @@ function ProjectsPanel({ content, onSave }: { content: Content; onSave: (c: Cont
   );
 }
 
-function SkillsPanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function SkillsPanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [items, setItems] = useState(content.skills);
 
   const update = (i: number, patch: Partial<(typeof items)[number]>) =>
@@ -470,7 +500,7 @@ function SkillsPanel({ content, onSave }: { content: Content; onSave: (c: Conten
   );
 }
 
-function ExperiencePanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function ExperiencePanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [items, setItems] = useState(content.experience);
 
   const update = (i: number, patch: Partial<(typeof items)[number]>) =>
@@ -527,7 +557,7 @@ function ExperiencePanel({ content, onSave }: { content: Content; onSave: (c: Co
   );
 }
 
-function ResumePanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function ResumePanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [url, setUrl] = useState(content.resumeUrl);
 
   const onFile = (f: File | null) => {
@@ -563,7 +593,7 @@ function ResumePanel({ content, onSave }: { content: Content; onSave: (c: Conten
   );
 }
 
-function SocialPanel({ content, onSave }: { content: Content; onSave: (c: Content) => void }) {
+function SocialPanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
   const [s, setS] = useState(content.profile.socials);
   const [email, setEmail] = useState(content.profile.email);
 
@@ -580,6 +610,89 @@ function SocialPanel({ content, onSave }: { content: Content; onSave: (c: Conten
       <SaveBar
         onSave={() =>
           onSave({ ...content, profile: { ...content.profile, socials: s, email } })
+        }
+      />
+    </div>
+  );
+}
+
+function ApiPanel({ content, onSave }: { content: AdminContent; onSave: (c: AdminContent) => void }) {
+  const [geminiApiKey, setGeminiApiKey] = useState(content.geminiApiKey ?? "");
+  const [cohereApiKey, setCohereApiKey] = useState(content.cohereApiKey ?? "");
+  const [primaryModel, setPrimaryModel] = useState<AdminContent["primaryModel"]>(
+    content.primaryModel ?? "static",
+  );
+  const [showGemini, setShowGemini] = useState(false);
+  const [showCohere, setShowCohere] = useState(false);
+
+  return (
+    <div>
+      <PanelHeader
+        title="API Configuration"
+        desc="AI keys are stored server-side only — never sent to public visitors."
+      />
+      <div className="space-y-4">
+        <label className="block">
+          <span className="text-xs font-mono text-muted-foreground">primary model</span>
+          <select
+            value={primaryModel}
+            onChange={(e) => setPrimaryModel(e.target.value as AdminContent["primaryModel"])}
+            className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm outline-none focus:border-cyan/50"
+          >
+            <option value="static">Static (no AI)</option>
+            <option value="gemini">Gemini</option>
+            <option value="cohere">Cohere</option>
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-mono text-muted-foreground">gemini api key</span>
+          <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+            <input
+              type={showGemini ? "text" : "password"}
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey(e.target.value)}
+              placeholder="Stored securely on server"
+              className="bg-transparent outline-none w-full text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowGemini(!showGemini)}
+              className="text-muted-foreground hover:text-cyan"
+            >
+              {showGemini ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-mono text-muted-foreground">cohere api key</span>
+          <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+            <input
+              type={showCohere ? "text" : "password"}
+              value={cohereApiKey}
+              onChange={(e) => setCohereApiKey(e.target.value)}
+              placeholder="Stored securely on server"
+              className="bg-transparent outline-none w-full text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCohere(!showCohere)}
+              className="text-muted-foreground hover:text-cyan"
+            >
+              {showCohere ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+        </label>
+      </div>
+      <SaveBar
+        onSave={() =>
+          onSave({
+            ...content,
+            geminiApiKey,
+            cohereApiKey,
+            primaryModel,
+          })
         }
       />
     </div>

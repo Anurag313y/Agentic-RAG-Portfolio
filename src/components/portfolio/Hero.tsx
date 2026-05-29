@@ -12,7 +12,8 @@ import {
   VolumeX,
   Cpu,
 } from "lucide-react";
-import { PROFILE, PROJECTS, SKILLS, EXPERIENCE } from "@/lib/portfolio-data";
+import { usePortfolio } from "@/context/portfolio";
+import type { PortfolioContent } from "@/lib/content.types";
 
 type JarvisState = "ready" | "listening" | "processing" | "responding";
 type HeroMode = "jarvis" | "terminal";
@@ -25,17 +26,18 @@ const SUGGESTIONS = [
   "Open the resume",
 ];
 
-function answerFor(raw: string): { text: string; action?: () => void } {
+function answerFor(raw: string, content: PortfolioContent): { text: string; action?: () => void } {
+  const { profile, projects, skills, experience, resumeUrl } = content;
   const q = raw.toLowerCase().trim();
   if (!q) return { text: "I didn't catch that. Try asking about projects, skills, or contact." };
 
   if (/(who|about|tell me|intro)/.test(q))
     return {
-      text: `${PROFILE.name} is a ${PROFILE.role}. ${PROFILE.headline} Based in ${PROFILE.location}.`,
+      text: `${profile.name} is a ${profile.role}. ${profile.headline} Based in ${profile.location}.`,
     };
 
   if (/(project|work|portfolio|build)/.test(q)) {
-    const top = PROJECTS.slice(0, 3).map((p) => p.title).join(", ");
+    const top = projects.slice(0, 3).map((p) => p.title).join(", ");
     return {
       text: `His top projects include ${top}. Scrolling to the projects section now.`,
       action: () => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" }),
@@ -43,21 +45,23 @@ function answerFor(raw: string): { text: string; action?: () => void } {
   }
 
   if (/(skill|stack|tech|language)/.test(q)) {
-    const flat = SKILLS.flatMap((s) => s.items).slice(0, 8).join(", ");
-    return { text: `Strongest skills: ${flat}, and more. Showing the full stack now.`,
-      action: () => document.getElementById("skills")?.scrollIntoView({ behavior: "smooth" }) };
+    const flat = skills.flatMap((s) => s.items).slice(0, 8).join(", ");
+    return {
+      text: `Strongest skills: ${flat}, and more. Showing the full stack now.`,
+      action: () => document.getElementById("skills")?.scrollIntoView({ behavior: "smooth" }),
+    };
   }
 
   if (/(contact|email|reach|hire|talk|message)/.test(q))
     return {
-      text: `Easiest path: email ${PROFILE.email}. Opening the contact channel.`,
+      text: `Easiest path: email ${profile.email}. Opening the contact channel.`,
       action: () => document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" }),
     };
 
   if (/(resume|cv|pdf)/.test(q))
     return {
       text: "Opening the resume in a new tab.",
-      action: () => window.open(PROFILE.resumeUrl, "_blank", "noopener,noreferrer"),
+      action: () => window.open(resumeUrl, "_blank", "noopener,noreferrer"),
     };
 
   if (/(experience|company|job|history)/.test(q))
@@ -91,6 +95,8 @@ function getRecognition(): any | null {
 }
 
 export function Hero() {
+  const content = usePortfolio();
+  const { profile } = content;
   const [state, setState] = useState<JarvisState>("ready");
   const [transcript, setTranscript] = useState("");
   const [response, setResponse] = useState<string>("");
@@ -151,7 +157,7 @@ export function Hero() {
       setState("processing");
       setTranscript(q);
       setTimeout(() => {
-        const { text, action } = answerFor(q);
+        const { text, action } = answerFor(q, content);
         setResponse(text);
         setState("responding");
         action?.();
@@ -159,7 +165,7 @@ export function Hero() {
         if (!voiceOn) setTimeout(() => setState("ready"), 1800);
       }, 600);
     },
-    [speak, voiceOn],
+    [speak, voiceOn, content],
   );
 
   const startListening = () => {
@@ -205,11 +211,11 @@ export function Hero() {
             online · available for work
           </div>
           <h1 className="mt-4 sm:mt-5 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
-            <span className="block text-foreground">{PROFILE.name}</span>
-            <span className="block text-gradient">{PROFILE.role}</span>
+            <span className="block text-foreground">{profile.name}</span>
+            <span className="block text-gradient">{profile.role}</span>
           </h1>
-          <p className="mt-4 sm:mt-5 text-base sm:text-lg text-foreground/85 max-w-xl">{PROFILE.headline}</p>
-          <p className="mt-2 text-sm text-muted-foreground max-w-xl">{PROFILE.intro}</p>
+          <p className="mt-4 sm:mt-5 text-base sm:text-lg text-foreground/85 max-w-xl">{profile.headline}</p>
+          <p className="mt-2 text-sm text-muted-foreground max-w-xl">{profile.intro}</p>
 
           <div className="mt-5 sm:mt-7 flex flex-wrap gap-2 sm:gap-3">
             <a
@@ -518,7 +524,7 @@ export function Hero() {
                   transition={{ duration: 0.35, ease: "easeOut" }}
                   className="relative flex-1 flex flex-col"
                 >
-                  <HeroTerminal />
+                  <HeroTerminal content={content} />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -545,26 +551,27 @@ const TERMINAL_HELP = [
   "  clear        — clear screen",
 ];
 
-function runHeroCommand(cmd: string): string[] {
+function runHeroCommand(cmd: string, content: PortfolioContent): string[] {
+  const { profile, projects, skills, experience, resumeUrl } = content;
   const c = cmd.trim().toLowerCase();
   if (!c) return [];
   if (c === "help" || c === "?") return TERMINAL_HELP;
   if (c === "whoami")
-    return [`${PROFILE.name} — ${PROFILE.role}`, PROFILE.headline, `location: ${PROFILE.location}`];
+    return [`${profile.name} — ${profile.role}`, profile.headline, `location: ${profile.location}`];
   if (c === "skills")
-    return SKILLS.flatMap((s) => [`▸ ${s.category}`, `   ${s.items.join(", ")}`]);
-  if (c === "projects") return PROJECTS.map((p) => `▸ ${p.title} — ${p.stack.join(" · ")}`);
+    return skills.flatMap((s) => [`▸ ${s.category}`, `   ${s.items.join(", ")}`]);
+  if (c === "projects") return projects.map((p) => `▸ ${p.title} — ${p.stack.join(" · ")}`);
   if (c === "experience")
-    return EXPERIENCE.map((e) => `▸ ${e.role} @ ${e.company}  (${e.duration})`);
+    return experience.map((e) => `▸ ${e.role} @ ${e.company}  (${e.duration})`);
   if (c === "resume") {
-    window.open(PROFILE.resumeUrl, "_blank", "noopener,noreferrer");
+    window.open(resumeUrl, "_blank", "noopener,noreferrer");
     return ["opening resume.pdf in a new tab..."];
   }
   if (c === "contact")
     return [
-      `email:    ${PROFILE.email}`,
-      `github:   ${PROFILE.socials.github}`,
-      `linkedin: ${PROFILE.socials.linkedin}`,
+      `email:    ${profile.email}`,
+      `github:   ${profile.socials.github}`,
+      `linkedin: ${profile.socials.linkedin}`,
     ];
   if (c === "sudo hire-me" || c === "hire-me")
     return ["[sudo] authenticating recruiter...", "✓ access granted.", "redirecting to contact ↓"];
@@ -586,14 +593,17 @@ const QUICK_CMDS = ["whoami", "skills", "projects", "resume", "sudo hire-me"];
 
 type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: string };
 
-// Welcome lines for typing animation
-const WELCOME_LINES = [
-  `Hi, I'm ${PROFILE.name}, a ${PROFILE.role}.`,
-  "Welcome to my interactive portfolio terminal.",
-  "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact).",
-];
+function getWelcomeLines(content: PortfolioContent) {
+  return [
+    `Hi, I'm ${content.profile.name}, a ${content.profile.role}.`,
+    "Welcome to my interactive portfolio terminal.",
+    "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact).",
+  ];
+}
 
-function HeroTerminal() {
+function HeroTerminal({ content }: { content: PortfolioContent }) {
+  const { profile } = content;
+  const WELCOME_LINES = getWelcomeLines(content);
   const [lines, setLines] = useState<TLine[]>([{ type: "in", text: "cd welcome" }]);
   const [input, setInput] = useState("");
   const [typingLineIndex, setTypingLineIndex] = useState(0);
@@ -643,7 +653,7 @@ function HeroTerminal() {
   }, [introComplete]);
 
   const submit = (cmd: string) => {
-    const out = runHeroCommand(cmd);
+    const out = runHeroCommand(cmd, content);
     if (out[0] === "__CLEAR__") {
       setLines([]);
       return;
@@ -673,7 +683,7 @@ function HeroTerminal() {
           <span className="size-2 sm:size-2.5 rounded-full bg-emerald/80" />
         </div>
         <span className="font-mono text-[10px] sm:text-[11px] text-muted-foreground">
-          {PROFILE.handle}: ~/portfolio
+          {profile.handle}: ~/portfolio
         </span>
         <span className="font-mono text-[9px] sm:text-[10px] text-emerald">● live</span>
       </div>
@@ -687,7 +697,7 @@ function HeroTerminal() {
           if (l.type === "in") {
             return (
               <div key={i}>
-                <span className="text-emerald">{PROFILE.handle}</span>
+                <span className="text-emerald">{profile.handle}</span>
                 <span className="text-muted-foreground">:~$</span>{" "}
                 <span className="text-foreground">{l.text}</span>
               </div>
@@ -786,7 +796,7 @@ function HeroTerminal() {
             }}
             className="flex items-center gap-2 mt-1"
           >
-            <span className="text-emerald">{PROFILE.handle}</span>
+            <span className="text-emerald">{profile.handle}</span>
             <span className="text-muted-foreground">:~$</span>
             <input
               ref={inputRef}

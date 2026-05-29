@@ -1,0 +1,9 @@
+# Copy this file to .dev.vars (gitignored) and fill in your values.
+# Never commit .dev.vars to GitHub.
+#
+# Local:  cp .dev.vars.example .dev.vars
+# Production (Cloudflare): wrangler secret put ADMIN_EMAIL
+#                         wrangler secret put ADMIN_PASSWORD
+
+ADMIN_EMAIL="your-admin-email@example.com"
+ADMIN_PASSWORD="use-a-strong-password-here"

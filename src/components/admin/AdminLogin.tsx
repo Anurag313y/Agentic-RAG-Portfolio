@@ -1,28 +1,27 @@
 import { useState } from "react";
-import { Cpu, Lock, Mail, ArrowRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { ADMIN } from "@/lib/portfolio-data";
-import { setAdminSession } from "@/lib/admin-store";
+import { ArrowRight, Cpu, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
+
+import { adminLogin } from "@/lib/api/auth.functions";
 
 export function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      if (email.trim().toLowerCase() === ADMIN.email && password === ADMIN.password) {
-        setAdminSession(true);
-        toast.success("Access granted");
-        onSuccess();
-      } else {
-        toast.error("Invalid credentials");
-      }
+    try {
+      await adminLogin({ data: { email, password } });
+      toast.success("Access granted");
+      onSuccess();
+    } catch {
+      toast.error("Invalid credentials");
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   return (

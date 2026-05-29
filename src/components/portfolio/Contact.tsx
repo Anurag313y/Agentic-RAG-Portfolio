@@ -1,26 +1,31 @@
 import { useState } from "react";
-import { Copy, Check, Github, Linkedin, Instagram, Mail, Send } from "lucide-react";
+import { Check, Copy, Github, Instagram, Linkedin, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
+
+import { usePortfolio } from "@/context/portfolio";
+import { submitContact } from "@/lib/api/contact.functions";
+
 import { SectionHeading } from "./SectionHeading";
-import { PROFILE } from "@/lib/portfolio-data";
 
 function sanitize(s: string) {
   return s.replace(/[<>]/g, "").trim().slice(0, 2000);
 }
 
 export function Contact() {
+  const { profile } = usePortfolio();
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
 
   const copy = async () => {
-    await navigator.clipboard.writeText(PROFILE.email);
+    await navigator.clipboard.writeText(profile.email);
     setCopied(true);
     toast.success("Email copied to clipboard");
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = sanitize(form.name);
     const email = sanitize(form.email);
@@ -34,10 +39,19 @@ export function Contact() {
       toast.error("Please enter a valid email");
       return;
     }
-    setSent(true);
-    toast.success("Message queued — I'll get back to you soon.");
-    setForm({ name: "", email: "", subject: "", message: "" });
-    setTimeout(() => setSent(false), 4000);
+
+    setLoading(true);
+    try {
+      await submitContact({ data: { name, email, subject, message } });
+      setSent(true);
+      toast.success("Message sent — I'll get back to you soon.");
+      setForm({ name: "", email: "", subject: "", message: "" });
+      setTimeout(() => setSent(false), 4000);
+    } catch {
+      toast.error("Failed to send message. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,8 +68,11 @@ export function Contact() {
             <div className="glass rounded-2xl p-6">
               <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest">email</div>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <a href={`mailto:${PROFILE.email}`} className="font-mono text-cyan hover:text-cyan-glow break-all">
-                  {PROFILE.email}
+                <a
+                  href={`mailto:${profile.email}`}
+                  className="font-mono text-cyan hover:text-cyan-glow break-all"
+                >
+                  {profile.email}
                 </a>
                 <button
                   onClick={copy}
@@ -71,10 +88,10 @@ export function Contact() {
               <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">social</div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { icon: Github, label: "GitHub", href: PROFILE.socials.github },
-                  { icon: Linkedin, label: "LinkedIn", href: PROFILE.socials.linkedin },
-                  { icon: Instagram, label: "Instagram", href: PROFILE.socials.instagram },
-                  { icon: Mail, label: "Email", href: `mailto:${PROFILE.email}` },
+                  { icon: Github, label: "GitHub", href: profile.socials.github },
+                  { icon: Linkedin, label: "LinkedIn", href: profile.socials.linkedin },
+                  { icon: Instagram, label: "Instagram", href: profile.socials.instagram },
+                  { icon: Mail, label: "Email", href: `mailto:${profile.email}` },
                 ].map((s) => (
                   <a
                     key={s.label}
@@ -93,7 +110,7 @@ export function Contact() {
               <div className="text-emerald">$ status</div>
               <div className="text-muted-foreground pl-2 mt-1">
                 <div>● available for work</div>
-                <div>● based in {PROFILE.location}</div>
+                <div>● based in {profile.location}</div>
                 <div>● replies in &lt; 24h</div>
               </div>
             </div>
@@ -149,14 +166,15 @@ export function Contact() {
               />
             </label>
             <div className="font-mono text-[11px] text-muted-foreground">
-              // Protected by spam filters and rate limits
+              // Stored securely — never exposed to the browser
             </div>
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan text-primary-foreground font-medium hover:bg-cyan-glow transition-colors glow-cyan"
+              disabled={loading}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan text-primary-foreground font-medium hover:bg-cyan-glow transition-colors glow-cyan disabled:opacity-60"
             >
               {sent ? <Check className="size-4" /> : <Send className="size-4" />}
-              {sent ? "Sent — talk soon" : "Send message"}
+              {sent ? "Sent — talk soon" : loading ? "Sending…" : "Send message"}
             </button>
           </form>
         </div>

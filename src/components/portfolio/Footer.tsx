@@ -1,21 +1,24 @@
-import { Github, Linkedin, Instagram, Mail } from "lucide-react";
-import { PROFILE } from "@/lib/portfolio-data";
+import { Github, Instagram, Linkedin, Mail } from "lucide-react";
+
+import { usePortfolio } from "@/context/portfolio";
 
 export function Footer() {
+  const { profile } = usePortfolio();
+
   return (
     <footer className="py-10 border-t border-border/60">
       <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="font-mono text-sm">
           <span className="text-emerald">$</span>{" "}
-          <span className="text-foreground">{PROFILE.name}</span>{" "}
+          <span className="text-foreground">{profile.name}</span>{" "}
           <span className="text-muted-foreground">— © {new Date().getFullYear()}</span>
         </div>
         <div className="flex items-center gap-2">
           {[
-            { icon: Github, href: PROFILE.socials.github, label: "GitHub" },
-            { icon: Linkedin, href: PROFILE.socials.linkedin, label: "LinkedIn" },
-            { icon: Instagram, href: PROFILE.socials.instagram, label: "Instagram" },
-            { icon: Mail, href: `mailto:${PROFILE.email}`, label: "Email" },
+            { icon: Github, href: profile.socials.github, label: "GitHub" },
+            { icon: Linkedin, href: profile.socials.linkedin, label: "LinkedIn" },
+            { icon: Instagram, href: profile.socials.instagram, label: "Instagram" },
+            { icon: Mail, href: `mailto:${profile.email}`, label: "Email" },
           ].map((s) => (
             <a
               key={s.label}

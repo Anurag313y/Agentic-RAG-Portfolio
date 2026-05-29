@@ -1,28 +1,13 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ExternalLink, Github, Sparkles } from "lucide-react";
+
+import { usePortfolio } from "@/context/portfolio";
+
 import { SectionHeading } from "./SectionHeading";
-import { PROJECTS, PROFILE } from "@/lib/portfolio-data";
-import { loadContent } from "@/lib/admin-store";
 
 export function Projects() {
-  const [items, setItems] = useState<Array<(typeof PROJECTS)[number] & { hidden?: boolean }>>(() =>
-    PROJECTS.map((p) => ({ ...p, hidden: false }))
-  );
-  const [profile, setProfile] = useState(PROFILE);
-
-  useEffect(() => {
-    const content = loadContent();
-    if (content?.projects) {
-      setItems(content.projects);
-    }
-    if (content?.profile) {
-      setProfile(content.profile);
-    }
-  }, []);
-
-  // Filter out projects marked as hidden by the admin console
-  const visibleProjects = items.filter((p) => !p.hidden);
+  const { profile, projects } = usePortfolio();
+  const visibleProjects = projects.filter((p) => !p.hidden);
 
   return (
     <section id="projects" className="py-16">
@@ -47,7 +32,9 @@ export function Projects() {
                 <div className="absolute -top-12 -right-12 size-40 rounded-full bg-cyan/10 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="font-mono text-xs text-cyan mb-2">project_{String(i + 1).padStart(2, "0")}</div>
+                    <div className="font-mono text-xs text-cyan mb-2">
+                      project_{String(i + 1).padStart(2, "0")}
+                    </div>
                     <h3 className="text-xl font-semibold tracking-tight">{p.title}</h3>
                   </div>
                   <Sparkles className="size-5 text-cyan/70 shrink-0" />
@@ -103,7 +90,6 @@ export function Projects() {
           ))}
         </div>
 
-        {/* Smart, theme-appropriate "View other/all projects" link */}
         <div className="mt-12 flex justify-center">
           <motion.a
             href={profile.socials.github}

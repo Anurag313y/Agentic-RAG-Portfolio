@@ -1,9 +1,13 @@
-import { motion } from "framer-motion";
-import { SectionHeading } from "./SectionHeading";
-import { EXPERIENCE } from "@/lib/portfolio-data";
 import { Briefcase } from "lucide-react";
+import { motion } from "framer-motion";
+
+import { usePortfolio } from "@/context/portfolio";
+
+import { SectionHeading } from "./SectionHeading";
 
 export function Experience() {
+  const { experience } = usePortfolio();
+
   return (
     <section id="experience" className="py-16">
       <div className="mx-auto max-w-7xl px-4">
@@ -15,7 +19,7 @@ export function Experience() {
         />
         <div className="relative max-w-3xl mx-auto">
           <div className="absolute left-4 sm:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-cyan/60 via-cyan/20 to-transparent sm:-translate-x-1/2" />
-          {EXPERIENCE.map((e, i) => {
+          {experience.map((e, i) => {
             const left = i % 2 === 0;
             return (
               <motion.div

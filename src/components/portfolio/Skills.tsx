@@ -1,9 +1,11 @@
 import { motion } from "framer-motion";
-import { SectionHeading } from "./SectionHeading";
-import { SKILLS } from "@/lib/portfolio-data";
 import {
   Layers, Server, Database, Wrench, Code, Cloud,
 } from "lucide-react";
+
+import { usePortfolio } from "@/context/portfolio";
+
+import { SectionHeading } from "./SectionHeading";
 
 const ICONS: Record<string, any> = {
   Frontend: Layers,
@@ -15,6 +17,8 @@ const ICONS: Record<string, any> = {
 };
 
 export function Skills() {
+  const { skills } = usePortfolio();
+
   return (
     <section id="skills" className="py-16 relative">
       <div className="mx-auto max-w-7xl px-4">
@@ -25,7 +29,7 @@ export function Skills() {
           description="The tools I reach for daily. Categorized for clarity."
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {SKILLS.map((cat, i) => {
+          {skills.map((cat, i) => {
             const Icon = ICONS[cat.category] ?? Code;
             return (
               <motion.div

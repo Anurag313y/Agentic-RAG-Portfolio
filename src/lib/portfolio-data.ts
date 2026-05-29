@@ -115,9 +115,5 @@ export const EXPERIENCE = [
   },
 ];
 
-// Frontend-only admin credentials (no backend yet).
-// TODO: replace with real auth once backend is wired up.
-export const ADMIN = {
-  email: "anuragyadav1015@gmail.com",
-  password: "Anu@123",
-};
+// Static seed data — used as build-time defaults and DB seed source.
+// Live content is served from D1 + KV cache via server functions.

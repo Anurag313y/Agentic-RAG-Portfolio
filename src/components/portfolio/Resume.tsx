@@ -1,9 +1,13 @@
-import { Download, FileText, ExternalLink } from "lucide-react";
+import { Download, ExternalLink, FileText } from "lucide-react";
+
+import { usePortfolio } from "@/context/portfolio";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 import { SectionHeading } from "./SectionHeading";
-import { PROFILE } from "@/lib/portfolio-data";
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogHeader } from "@/components/ui/dialog";
 
 export function Resume() {
+  const { profile, resumeUrl } = usePortfolio();
+
   return (
     <section id="resume" className="py-16">
       <div className="mx-auto max-w-7xl px-4">
@@ -19,10 +23,8 @@ export function Resume() {
               <FileText className="size-7" />
             </div>
             <div>
-              <div className="font-semibold text-lg">{PROFILE.name} — Resume.pdf</div>
-              <div className="text-sm text-muted-foreground font-mono">
-                last updated · 2026 · 1 page
-              </div>
+              <div className="font-semibold text-lg">{profile.name} — Resume.pdf</div>
+              <div className="text-sm text-muted-foreground font-mono">last updated · 2026 · 1 page</div>
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -36,14 +38,10 @@ export function Resume() {
                 <DialogHeader className="px-4 py-3 border-b border-border/60">
                   <DialogTitle className="font-mono text-sm">resume.pdf</DialogTitle>
                 </DialogHeader>
-                <object
-                  data={PROFILE.resumeUrl}
-                  type="application/pdf"
-                  className="w-full h-[calc(85vh-49px)]"
-                >
+                <object data={resumeUrl} type="application/pdf" className="w-full h-[calc(85vh-49px)]">
                   <div className="p-6 text-center text-muted-foreground">
                     Your browser can't preview PDFs.{" "}
-                    <a className="text-cyan underline" href={PROFILE.resumeUrl} target="_blank" rel="noopener noreferrer">
+                    <a className="text-cyan underline" href={resumeUrl} target="_blank" rel="noopener noreferrer">
                       Open the resume
                     </a>
                     .
@@ -52,7 +50,7 @@ export function Resume() {
               </DialogContent>
             </Dialog>
             <a
-              href={PROFILE.resumeUrl}
+              href={resumeUrl}
               download
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg glass glass-hover font-medium"
             >

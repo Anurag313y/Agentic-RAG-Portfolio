@@ -1,11 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { AdminLogin } from "@/components/admin/AdminLogin";
+import { useState } from "react";
+
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
-import { isAdminAuthed } from "@/lib/admin-store";
+import { AdminLogin } from "@/components/admin/AdminLogin";
 import { Toaster } from "@/components/ui/sonner";
+import { checkAdminSession } from "@/lib/api/auth.functions";
+import { getAdminContent } from "@/lib/api/portfolio.functions";
+import type { AdminContent } from "@/lib/content.types";
+import { fetchAdminContent, isAdminSessionValid } from "@/lib/content.server";
 
 export const Route = createFileRoute("/admin")({
+  loader: async () => {
+    const authenticated = await isAdminSessionValid();
+    if (!authenticated) {
+      return { authenticated: false as const, content: null };
+    }
+    const content = await fetchAdminContent();
+    return { authenticated: true as const, content };
+  },
   head: () => ({
     meta: [
       { title: "Admin Console — Anurag Yadav" },
@@ -16,22 +28,29 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const loaderData = Route.useLoaderData();
+  const [authed, setAuthed] = useState(loaderData.authenticated);
+  const [content, setContent] = useState<AdminContent | null>(loaderData.content);
 
-  useEffect(() => {
-    setAuthed(isAdminAuthed());
-    setHydrated(true);
-  }, []);
+  const onLoginSuccess = async () => {
+    const session = await checkAdminSession();
+    if (!session.authenticated) return;
+    const adminContent = await getAdminContent();
+    setContent(adminContent);
+    setAuthed(true);
+  };
 
-  if (!hydrated) return null;
+  const onLogout = () => {
+    setAuthed(false);
+    setContent(null);
+  };
 
   return (
     <>
-      {authed ? (
-        <AdminDashboard onLogout={() => setAuthed(false)} />
+      {authed && content ? (
+        <AdminDashboard initialContent={content} onLogout={onLogout} />
       ) : (
-        <AdminLogin onSuccess={() => setAuthed(true)} />
+        <AdminLogin onSuccess={onLoginSuccess} />
       )}
       <Toaster theme="dark" position="bottom-right" />
     </>

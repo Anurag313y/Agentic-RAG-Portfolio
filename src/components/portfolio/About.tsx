@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { SectionHeading } from "./SectionHeading";
 import { Code2, Cpu, Gauge, Shield } from "lucide-react";
-import { loadContent } from "@/lib/admin-store";
-import { PROFILE } from "@/lib/portfolio-data";
+
+import { usePortfolio } from "@/context/portfolio";
+
+import { SectionHeading } from "./SectionHeading";
 
 const PILLARS = [
   { icon: Gauge, title: "Performance", text: "Sub-100ms interactions, profiled, measured, optimized." },
@@ -13,14 +13,7 @@ const PILLARS = [
 ];
 
 export function About() {
-  const [profile, setProfile] = useState(PROFILE);
-
-  useEffect(() => {
-    const content = loadContent();
-    if (content?.profile) {
-      setProfile(content.profile);
-    }
-  }, []);
+  const { profile } = usePortfolio();
 
   return (
     <section id="about" className="py-16">
@@ -33,7 +26,6 @@ export function About() {
         />
 
         <div className="grid lg:grid-cols-[1fr_1.1fr_1.3fr] gap-8 items-start">
-          {/* Column 1: Professional Holographic Profile Photo */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -41,11 +33,9 @@ export function About() {
             transition={{ duration: 0.6 }}
             className="glass rounded-2xl p-4 relative overflow-hidden group border border-cyan/20"
           >
-            {/* Scanlines layer */}
             <div className="absolute inset-0 bg-scanlines pointer-events-none opacity-[0.08] z-10" />
             <div className="absolute inset-0 bg-gradient-to-t from-cyan/15 via-transparent to-transparent pointer-events-none z-10 opacity-70 group-hover:opacity-90 transition-opacity" />
-            
-            {/* Hologram/terminal corners */}
+
             <div className="absolute top-2 left-2 size-2.5 border-t border-l border-cyan/60" />
             <div className="absolute top-2 right-2 size-2.5 border-t border-r border-cyan/60" />
             <div className="absolute bottom-2 left-2 size-2.5 border-b border-l border-cyan/60" />
@@ -53,23 +43,25 @@ export function About() {
 
             <div className="relative aspect-square rounded-xl overflow-hidden bg-background/40 border border-border/40">
               <img
-                src={profile.photoUrl || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80"}
+                src={
+                  profile.photoUrl ||
+                  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80"
+                }
                 alt={profile.name}
                 className="w-full h-full object-cover grayscale contrast-125 brightness-95 group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700"
                 onError={(e) => {
-                  e.currentTarget.src = "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80";
+                  e.currentTarget.src =
+                    "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80";
                 }}
               />
             </div>
 
-            {/* Hologram metadata footer */}
             <div className="mt-3 flex justify-between items-center font-mono text-[9px] text-muted-foreground/80 px-1">
               <span>SYS.IMG // {profile.name.toUpperCase().replace(/\s+/g, "_")}</span>
               <span className="text-cyan animate-pulse">● ONLINE</span>
             </div>
           </motion.div>
 
-          {/* Column 2: JSON Code block */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -104,7 +96,6 @@ export function About() {
             <div>{"};"}</div>
           </motion.div>
 
-          {/* Column 3: Pillars */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-1 gap-4">
             {PILLARS.map((p, i) => (
               <motion.div
