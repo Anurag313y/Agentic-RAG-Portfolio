@@ -572,15 +572,24 @@ type TLine = { type: "in" | "out" | "muted"; text: string };
 function HeroTerminal() {
   const intro: TLine[] = [
     { type: "in", text: "cat /portfolio/terminal.md" },
-    { type: "muted", text: "// developer console" },
-    { type: "out", text: "Linux Command Line" },
+    { type: "muted", text: "// DEVELOPER CONSOLE · v1.0.4" },
+    { type: "heading", text: "Linux Command Line" },
     {
       type: "muted",
       text:
-        "A live shell wired to my portfolio. Prefer keys over clicks? Type a command or pick a chip.",
+        "A live shell wired straight into my portfolio — every section, project, and link is one command away.",
+    },
+    {
+      type: "muted",
+      text:
+        "Prefer keys over clicks? Type a command or pick a chip below. Tab-friendly, recruiter-friendly.",
     },
     { type: "out", text: "" },
-    { type: "out", text: "Type 'help' to list commands." },
+    { type: "kv", text: "session   · anurag@portfolio (secure · read-only)" },
+    { type: "kv", text: "shell     · zsh 5.9  ·  tty/anurag" },
+    { type: "kv", text: "uptime    · online · available for work" },
+    { type: "out", text: "" },
+    { type: "hint", text: "↳ try 'help' to list commands, or 'sudo hire-me' to start a conversation." },
   ];
   const [lines, setLines] = useState<TLine[]>(intro);
   const [input, setInput] = useState("");
@@ -642,7 +651,31 @@ function HeroTerminal() {
           }
           if (l.type === "muted") {
             return (
-              <div key={i} className="text-cyan/60 pl-1">
+              <div key={i} className="text-cyan/60 pl-1 tracking-wide">
+                {l.text}
+              </div>
+            );
+          }
+          if (l.type === "heading") {
+            return (
+              <div
+                key={i}
+                className="pl-1 mt-1 mb-1 text-base sm:text-lg font-semibold tracking-tight text-gradient"
+              >
+                {l.text}
+              </div>
+            );
+          }
+          if (l.type === "kv") {
+            return (
+              <div key={i} className="pl-1 text-foreground/80">
+                <span className="text-cyan/80">›</span> {l.text}
+              </div>
+            );
+          }
+          if (l.type === "hint") {
+            return (
+              <div key={i} className="pl-1 text-emerald/80 italic">
                 {l.text}
               </div>
             );
