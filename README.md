@@ -524,8 +524,4 @@ The Worker is named **`anurag-portfolio`** with observability enabled (see `wran
 - **JARVIS dependency:** `@deepgram/sdk` on client for live STT; server uses `fetch` for grant + speak
 - **Rate limiting:** JARVIS endpoints rate-limited per IP via Cloudflare KV
 
----
-
-## License
-
-Private project.
+-
