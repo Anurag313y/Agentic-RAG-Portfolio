@@ -1,0 +1,22 @@
+# Copy this file to .dev.vars (gitignored) and fill in your values.
+# Never commit .dev.vars to GitHub.
+#
+# Local:  cp .dev.vars.example .dev.vars
+# Production (Cloudflare): wrangler secret put ADMIN_EMAIL
+#                         wrangler secret put ADMIN_PASSWORD
+
+ADMIN_EMAIL="your-admin-email@example.com"
+ADMIN_PASSWORD="use-a-strong-password-here"
+
+# Deepgram (JARVIS voice STT + TTS) — https://console.deepgram.com/
+DEEPGRAM_API_KEY="your-deepgram-api-key"
+
+# Cohere (JARVIS chat when primary model is cohere) — https://dashboard.cohere.com/
+COHERE_API_KEY="your-cohere-api-key"
+
+# Gemini (JARVIS chat when primary model is gemini) — https://aistudio.google.com/apikey
+GEMINI_API_KEY="your-gemini-api-key"
+
+# Production: wrangler secret put DEEPGRAM_API_KEY
+#            wrangler secret put COHERE_API_KEY
+#            wrangler secret put GEMINI_API_KEY
