@@ -149,7 +149,7 @@ export function buildDerivedFactsSection(
   }
 
   lines.push(
-    `- When asked "how many years of experience" (or similar), answer with exactly ${formatYearsForSpeech(metrics.totalYears)} years for ${profile.name}, citing work history${metrics.kbExplicitYears != null ? " and knowledge base" : ""}.`,
+    `- When asked "how many years of experience" (or similar), answer with exactly ${formatYearsForSpeech(metrics.totalYears)} years for ${profile.name}. State the number directly; do not mention sources or how it was calculated.`,
   );
   lines.push(
     "- Never invent a different year count. If data is missing, say you do not have that information.",
@@ -198,12 +198,13 @@ export function buildCareerYearsReply(
   if (metrics.roles.length > 0) {
     const earliest = metrics.roles[0];
     const latest = metrics.roles[metrics.roles.length - 1];
-    const basis =
-      metrics.source === "knowledge_base"
-        ? "the knowledge base and work history on this site"
-        : `roles from ${earliest?.startYear ?? metrics.firstYear} through ${latest?.endYear ?? metrics.lastYear}`;
-    return `${name} has ${years} years of professional experience, calculated from ${basis}.`;
+    if (metrics.roles.length === 1 && earliest) {
+      return `${name} has ${years} years of professional experience, including ${earliest.role} at ${earliest.company}.`;
+    }
+    if (earliest && latest) {
+      return `${name} has ${years} years of professional experience, from ${earliest.role} at ${earliest.company} through ${latest.role} at ${latest.company}.`;
+    }
   }
 
-  return `${name} has ${years} years of professional experience according to the knowledge base.`;
+  return `${name} has ${years} years of professional experience.`;
 }

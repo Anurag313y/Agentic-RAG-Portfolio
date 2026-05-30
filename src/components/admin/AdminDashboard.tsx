@@ -30,6 +30,8 @@ import {
 } from "@/lib/api/portfolio.functions";
 import type { AdminContent } from "@/lib/admin-store";
 import { JARVIS_KNOWLEDGE_BASE_MAX, PORTFOLIO_QUERY_KEY } from "@/lib/content.types";
+import { compressImageFile, formatDataUrlSize } from "@/lib/media";
+import { readFileAsDataUrl } from "@/lib/resume";
 
 type Tab =
   | "profile"
@@ -68,10 +70,16 @@ export function AdminDashboard({
   const [saving, setSaving] = useState(false);
 
   const persist = async (next: AdminContent) => {
-    setContent(next);
+    const merged: AdminContent = {
+      ...next,
+      deepgramApiKey: next.deepgramApiKey?.trim() || content.deepgramApiKey || "",
+      cohereApiKey: next.cohereApiKey?.trim() || content.cohereApiKey || "",
+      geminiApiKey: next.geminiApiKey?.trim() || content.geminiApiKey || "",
+    };
+    setContent(merged);
     setSaving(true);
     try {
-      await updatePortfolioContent({ data: next });
+      await updatePortfolioContent({ data: merged });
       await queryClient.invalidateQueries({ queryKey: PORTFOLIO_QUERY_KEY });
       toast.success("Saved");
     } catch {
@@ -304,24 +312,19 @@ function ProfilePanel({
 }) {
   const [p, setP] = useState(content.profile);
 
-  const handleFileChange = (file: File | null) => {
+  const handleFileChange = async (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file (PNG, JPG, WEBP, etc.)");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) {
-        setP((prev) => ({ ...prev, photoUrl: result }));
-        toast.success("Photo loaded — click Save to apply");
-      }
-    };
-    reader.onerror = () => {
-      toast.error("Failed to read image file");
-    };
-    reader.readAsDataURL(file);
+    try {
+      const result = await compressImageFile(file, { maxWidth: 800, maxHeight: 800 });
+      setP((prev) => ({ ...prev, photoUrl: result }));
+      toast.success(`Photo ready (${formatDataUrlSize(result)}) — click Save to apply`);
+    } catch {
+      toast.error("Failed to process image file");
+    }
   };
 
   return (
@@ -414,6 +417,100 @@ function AboutPanel({
   );
 }
 
+const PROJECT_IMAGE_FALLBACK =
+  "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80";
+
+function ProjectImageEditor({
+  imageUrl,
+  title,
+  onChange,
+}: {
+  imageUrl?: string;
+  title: string;
+  onChange: (url: string) => void;
+}) {
+  const previewSrc = imageUrl?.trim() || PROJECT_IMAGE_FALLBACK;
+  const isUploaded = imageUrl?.startsWith("data:") ?? false;
+
+  const handleFileChange = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (PNG, JPG, WEBP, etc.)");
+      return;
+    }
+    try {
+      const result = await compressImageFile(file);
+      onChange(result);
+      toast.success(`Image ready (${formatDataUrlSize(result)}) — click Save to apply`);
+    } catch {
+      toast.error("Failed to process image file");
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-border/60 bg-background/20 p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
+          card image
+        </span>
+        {imageUrl?.trim() ? (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-[10px] px-2 py-1 rounded-md border border-border hover:border-destructive/40 text-muted-foreground hover:text-destructive"
+          >
+            Remove image
+          </button>
+        ) : null}
+      </div>
+      <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-start">
+        <div className="space-y-2 min-w-0">
+          {isUploaded ? (
+            <div className="rounded-lg border border-emerald/30 bg-emerald/5 px-3 py-2">
+              <p className="text-xs font-mono text-emerald">Uploaded image stored</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {formatDataUrlSize(imageUrl!)} — saved when you click Save changes
+              </p>
+            </div>
+          ) : (
+            <Field label="image url" value={imageUrl || ""} onChange={onChange} />
+          )}
+          <label className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-cyan/30 p-3 bg-background/30 cursor-pointer hover:border-cyan/50 transition-colors">
+            <Upload className="size-4 text-cyan" />
+            <span className="text-[10px] text-muted-foreground font-mono">
+              {isUploaded ? "Replace image" : "Upload project image"}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                void handleFileChange(e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          <div className="size-[88px] aspect-square rounded-lg overflow-hidden border border-cyan/20 bg-background ring-1 ring-white/5">
+            <img
+              src={previewSrc}
+              alt={`${title} preview`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.src = PROJECT_IMAGE_FALLBACK;
+              }}
+            />
+          </div>
+          <span className="text-[9px] font-mono text-muted-foreground text-center max-w-[88px]">
+            {isUploaded ? "Uploaded" : imageUrl?.trim() ? "URL set" : "Default"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProjectsPanel({
   content,
   onSave,
@@ -437,6 +534,7 @@ function ProjectsPanel({
         features: [],
         github: "",
         demo: "",
+        imageUrl: "",
         hidden: false,
       },
     ]);
@@ -508,6 +606,11 @@ function ProjectsPanel({
                 }
               />
             </div>
+            <ProjectImageEditor
+              imageUrl={p.imageUrl}
+              title={p.title}
+              onChange={(imageUrl) => update(i, { imageUrl })}
+            />
           </div>
         ))}
       </div>
@@ -685,16 +788,19 @@ function ResumePanel({
 }) {
   const [url, setUrl] = useState(content.resumeUrl);
 
-  const onFile = (f: File | null) => {
+  const onFile = async (f: File | null) => {
     if (!f) return;
     if (f.type !== "application/pdf") {
       toast.error("Please upload a PDF");
       return;
     }
-    // Frontend-only: convert to object URL. (Backend will replace with proper storage.)
-    const obj = URL.createObjectURL(f);
-    setUrl(obj);
-    toast.success("PDF loaded — click Save to apply");
+    try {
+      const dataUrl = await readFileAsDataUrl(f);
+      setUrl(dataUrl);
+      toast.success("PDF loaded — click Save to apply");
+    } catch {
+      toast.error("Could not read the PDF file");
+    }
   };
 
   return (
@@ -712,6 +818,11 @@ function ResumePanel({
       </div>
       <div className="mt-4">
         <Field label="current resume url" value={url} onChange={setUrl} />
+        {url.trim().startsWith("blob:") && (
+          <p className="mt-2 text-xs font-mono text-amber-400/90">
+            This link expired after a refresh. Upload the PDF again and save.
+          </p>
+        )}
       </div>
       <SaveBar
         onSave={() =>
@@ -781,8 +892,7 @@ function KnowledgeBasePanel({
         <p className="mt-2">
           Then open <span className="text-cyan font-mono">API Configuration</span> → set{" "}
           <span className="text-cyan font-mono">primary model</span> to{" "}
-          <span className="text-cyan font-mono">Cohere</span> and save your Cohere API key (or use{" "}
-          <span className="text-cyan font-mono">COHERE_API_KEY</span> in .dev.vars).
+          <span className="text-cyan font-mono">Cohere</span> and save your Cohere API key.
         </p>
       </div>
       <label className="block">
@@ -813,6 +923,65 @@ function KnowledgeBasePanel({
   );
 }
 
+function KeyStatus({ configured, label }: { configured: boolean; label: string }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-md border ${
+        configured
+          ? "border-emerald/35 bg-emerald/10 text-emerald"
+          : "border-border/70 bg-background/40 text-muted-foreground"
+      }`}
+    >
+      <span
+        className={`size-1.5 rounded-full ${configured ? "bg-emerald animate-pulse" : "bg-muted-foreground/50"}`}
+      />
+      {label}: {configured ? "configured" : "not set"}
+    </span>
+  );
+}
+
+function SecretKeyField({
+  label,
+  value,
+  onChange,
+  visible,
+  onToggleVisible,
+  saved,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  visible: boolean;
+  onToggleVisible: () => void;
+  saved: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-mono text-muted-foreground">{label}</span>
+      <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-2">
+        <input
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={saved ? "Saved — enter a new key to replace" : placeholder}
+          className="bg-transparent outline-none w-full text-sm font-mono"
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={onToggleVisible}
+          className="text-muted-foreground hover:text-cyan shrink-0"
+          aria-label={visible ? "Hide key" : "Show key"}
+        >
+          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+      </div>
+    </label>
+  );
+}
+
 function ApiPanel({
   content,
   onSave,
@@ -820,8 +989,9 @@ function ApiPanel({
   content: AdminContent;
   onSave: (c: AdminContent) => void;
 }) {
-  const [geminiApiKey, setGeminiApiKey] = useState(content.geminiApiKey ?? "");
-  const [cohereApiKey, setCohereApiKey] = useState(content.cohereApiKey ?? "");
+  const [deepgramApiKey, setDeepgramApiKey] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [cohereApiKey, setCohereApiKey] = useState("");
   const [primaryModel, setPrimaryModel] = useState<AdminContent["primaryModel"]>(
     content.primaryModel ?? "static",
   );
@@ -830,109 +1000,137 @@ function ApiPanel({
   const [deepgramTtsModel, setDeepgramTtsModel] = useState(
     content.deepgramTtsModel ?? "aura-2-thalia-en",
   );
+  const [showDeepgram, setShowDeepgram] = useState(false);
   const [showGemini, setShowGemini] = useState(false);
   const [showCohere, setShowCohere] = useState(false);
+
+  const deepgramConfigured = Boolean(deepgramApiKey.trim() || content.deepgramApiKey?.trim());
+  const cohereConfigured = Boolean(cohereApiKey.trim() || content.cohereApiKey?.trim());
+  const geminiConfigured = Boolean(geminiApiKey.trim() || content.geminiApiKey?.trim());
 
   return (
     <div>
       <PanelHeader
         title="API Configuration"
-        desc="AI keys stay server-side. Deepgram API key is set via DEEPGRAM_API_KEY in .dev.vars / Wrangler secrets."
+        desc="Manage provider keys from the admin panel. Keys are stored server-side and never exposed on the public site."
       />
-      <div className="space-y-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={jarvisEnabled}
-            onChange={(e) => setJarvisEnabled(e.target.checked)}
-            className="rounded border-border"
-          />
-          <span className="text-sm">JARVIS voice assistant enabled</span>
-        </label>
 
-        <label className="block">
-          <span className="text-xs font-mono text-muted-foreground">deepgram STT model</span>
-          <input
-            value={deepgramSttModel}
-            onChange={(e) => setDeepgramSttModel(e.target.value)}
-            placeholder="nova-3"
-            className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm font-mono outline-none focus:border-cyan/50"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-mono text-muted-foreground">deepgram TTS model</span>
-          <input
-            value={deepgramTtsModel}
-            onChange={(e) => setDeepgramTtsModel(e.target.value)}
-            placeholder="aura-2-thalia-en"
-            className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm font-mono outline-none focus:border-cyan/50"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-mono text-muted-foreground">primary model</span>
-          <select
-            value={primaryModel}
-            onChange={(e) => setPrimaryModel(e.target.value as AdminContent["primaryModel"])}
-            className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm outline-none focus:border-cyan/50"
-          >
-            <option value="static">Static (no AI)</option>
-            <option value="gemini">Gemini</option>
-            <option value="cohere">Cohere (uses Knowledge Base)</option>
-          </select>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            For AI answers from your Knowledge Base tab, choose Cohere or Gemini and save a valid API
-            key.
-          </p>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-mono text-muted-foreground">gemini api key</span>
-          <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-2">
-            <input
-              type={showGemini ? "text" : "password"}
-              value={geminiApiKey}
-              onChange={(e) => setGeminiApiKey(e.target.value)}
-              placeholder="Stored securely on server"
-              className="bg-transparent outline-none w-full text-sm font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowGemini(!showGemini)}
-              className="text-muted-foreground hover:text-cyan"
-            >
-              {showGemini ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-mono text-muted-foreground">cohere api key</span>
-          <div className="mt-1 flex items-center gap-2 rounded-lg border border-border/70 bg-background/50 px-3 py-2">
-            <input
-              type={showCohere ? "text" : "password"}
-              value={cohereApiKey}
-              onChange={(e) => setCohereApiKey(e.target.value)}
-              placeholder="Stored securely on server"
-              className="bg-transparent outline-none w-full text-sm font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowCohere(!showCohere)}
-              className="text-muted-foreground hover:text-cyan"
-            >
-              {showCohere ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
-        </label>
+      <div className="mb-5 flex flex-wrap gap-2">
+        <KeyStatus configured={deepgramConfigured} label="Deepgram" />
+        <KeyStatus configured={cohereConfigured} label="Cohere" />
+        <KeyStatus configured={geminiConfigured} label="Gemini" />
       </div>
+
+      <div className="mb-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed">
+        Save keys here to enable JARVIS voice and AI replies without redeploying. Environment
+        variables in <span className="font-mono text-cyan">.dev.vars</span> are used only when a
+        field is left empty.
+      </div>
+
+      <div className="space-y-6">
+        <section className="space-y-4 rounded-xl border border-border/60 bg-background/20 p-4">
+          <div>
+            <h3 className="text-sm font-semibold">Voice — Deepgram</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Powers JARVIS speech-to-text and text-to-speech.
+            </p>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={jarvisEnabled}
+              onChange={(e) => setJarvisEnabled(e.target.checked)}
+              className="rounded border-border"
+            />
+            <span className="text-sm">JARVIS voice assistant enabled</span>
+          </label>
+
+          <SecretKeyField
+            label="deepgram api key"
+            value={deepgramApiKey}
+            onChange={setDeepgramApiKey}
+            visible={showDeepgram}
+            onToggleVisible={() => setShowDeepgram(!showDeepgram)}
+            saved={Boolean(content.deepgramApiKey?.trim())}
+            placeholder="Paste Deepgram API key"
+          />
+
+          <label className="block">
+            <span className="text-xs font-mono text-muted-foreground">deepgram STT model</span>
+            <input
+              value={deepgramSttModel}
+              onChange={(e) => setDeepgramSttModel(e.target.value)}
+              placeholder="nova-3"
+              className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm font-mono outline-none focus:border-cyan/50"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-mono text-muted-foreground">deepgram TTS model</span>
+            <input
+              value={deepgramTtsModel}
+              onChange={(e) => setDeepgramTtsModel(e.target.value)}
+              placeholder="aura-2-thalia-en"
+              className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm font-mono outline-none focus:border-cyan/50"
+            />
+          </label>
+        </section>
+
+        <section className="space-y-4 rounded-xl border border-border/60 bg-background/20 p-4">
+          <div>
+            <h3 className="text-sm font-semibold">Language models</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Choose a primary model and add the matching API key for AI-powered JARVIS replies.
+            </p>
+          </div>
+
+          <label className="block">
+            <span className="text-xs font-mono text-muted-foreground">primary model</span>
+            <select
+              value={primaryModel}
+              onChange={(e) => setPrimaryModel(e.target.value as AdminContent["primaryModel"])}
+              className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm outline-none focus:border-cyan/50"
+            >
+              <option value="static">Static (no AI)</option>
+              <option value="gemini">Gemini</option>
+              <option value="cohere">Cohere (uses Knowledge Base)</option>
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              For AI answers from your Knowledge Base tab, choose Cohere or Gemini and save a valid
+              API key.
+            </p>
+          </label>
+
+          <SecretKeyField
+            label="cohere api key"
+            value={cohereApiKey}
+            onChange={setCohereApiKey}
+            visible={showCohere}
+            onToggleVisible={() => setShowCohere(!showCohere)}
+            saved={Boolean(content.cohereApiKey?.trim())}
+            placeholder="Paste Cohere API key"
+          />
+
+          <SecretKeyField
+            label="gemini api key"
+            value={geminiApiKey}
+            onChange={setGeminiApiKey}
+            visible={showGemini}
+            onToggleVisible={() => setShowGemini(!showGemini)}
+            saved={Boolean(content.geminiApiKey?.trim())}
+            placeholder="Paste Gemini API key"
+          />
+        </section>
+      </div>
+
       <SaveBar
         onSave={() =>
           onSave({
             ...content,
-            geminiApiKey,
-            cohereApiKey,
+            deepgramApiKey: deepgramApiKey.trim() || content.deepgramApiKey || "",
+            geminiApiKey: geminiApiKey.trim() || content.geminiApiKey || "",
+            cohereApiKey: cohereApiKey.trim() || content.cohereApiKey || "",
             primaryModel,
             jarvisEnabled,
             deepgramSttModel,

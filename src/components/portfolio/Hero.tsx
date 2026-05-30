@@ -15,6 +15,7 @@ import {
 import { usePortfolio } from "@/context/portfolio";
 import { useJarvisVoice } from "@/hooks/use-jarvis-voice";
 import type { PortfolioContent } from "@/lib/content.types";
+import { resolveResumeUrl } from "@/lib/resume";
 
 type HeroMode = "jarvis" | "terminal";
 
@@ -45,20 +46,21 @@ export function Hero() {
   } = useJarvisVoice(content.resumeUrl);
 
   return (
-    <section id="home" className="relative min-h-0 lg:min-h-[100svh] pt-24 sm:pt-28 pb-8 sm:pb-12 overflow-hidden">
+    <section id="home" className="relative min-h-0 lg:min-h-[100svh] pt-20 sm:pt-28 pb-6 sm:pb-12 overflow-hidden scroll-mt-24">
       <div className="absolute inset-0 grid-bg pointer-events-none" />
-      <div className="section-container grid lg:grid-cols-[1fr_1.05fr] gap-6 sm:gap-8 lg:gap-10 items-start lg:items-center">
-        {/* LEFT — identity */}
+      <div className="section-container grid lg:grid-cols-[1fr_1.05fr] gap-5 sm:gap-8 lg:gap-10 items-start lg:items-stretch">
+        {/* LEFT — stats pin to bottom on lg to match JARVIS panel */}
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
+          className="self-start w-full lg:self-stretch lg:flex lg:flex-col"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass font-mono text-xs text-cyan">
             <span className="size-2 rounded-full bg-emerald animate-pulse" />
             online · available for work
           </div>
-          <h1 className="mt-4 sm:mt-5 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
+          <h1 className="mt-3 sm:mt-5 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
             <span className="block text-foreground">{profile.name}</span>
             <span className="block text-gradient">{profile.role}</span>
           </h1>
@@ -100,7 +102,7 @@ export function Hero() {
             <span className="text-cyan opacity-70 group-hover:opacity-100 transition-opacity">→</span>
           </button>
 
-          <div className="mt-6 sm:mt-8 grid grid-cols-3 max-w-md gap-1.5 sm:gap-3 font-mono w-full">
+          <div className="mt-6 sm:mt-8 lg:mt-auto grid grid-cols-3 max-w-md gap-1.5 sm:gap-3 font-mono w-full">
             {[
               { k: "1+", v: "years" },
               { k: "30+", v: "projects" },
@@ -121,12 +123,11 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
-          className="relative w-full lg:min-h-[560px]"
+          className="relative w-full self-start lg:self-stretch lg:flex lg:flex-col lg:min-h-0"
         >
-          {/* Borderless hero-right: top toolbar floats over a hologram surface */}
-          <div className="relative flex flex-col lg:min-h-full">
+          <div className="relative flex flex-col lg:flex-1 lg:min-h-0">
             {/* Top floating toolbar */}
-            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between mb-3 sm:mb-4 gap-3 shrink-0">
+            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between mb-2 sm:mb-3 lg:mb-2 gap-3 shrink-0">
               <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
                 <div className="size-7 sm:size-8 rounded-md bg-cyan/15 border border-cyan/40 grid place-items-center glow-cyan shrink-0">
                   <Cpu className="size-3.5 sm:size-4 text-cyan" />
@@ -182,20 +183,22 @@ export function Hero() {
               </div>
             </div>
 
-            <div className="relative w-full">
+            <div className="relative w-full min-h-[300px] sm:min-h-[380px] lg:min-h-0 lg:flex-1 lg:h-full">
               <motion.div
                 key="jarvis"
                 initial={false}
-                animate={{
-                  opacity: mode === "jarvis" ? 1 : 0,
-                  y: mode === "jarvis" ? 0 : 4,
-                }}
+                animate={{ opacity: mode === "jarvis" ? 1 : 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className={`flex flex-col ${mode === "jarvis" ? "relative" : "hidden"}`}
+                className={`flex h-full min-h-full flex-col justify-between w-full ${
+                  mode === "jarvis"
+                    ? "relative z-10"
+                    : "absolute inset-0 z-0 opacity-0 pointer-events-none"
+                }`}
                 aria-hidden={mode !== "jarvis"}
               >
+                <div className="flex flex-col flex-1 justify-center min-h-0">
                   {/* Voice toggle (floating, no card) */}
-                  <div className="flex items-center justify-end mb-2">
+                  <div className="flex items-center justify-end mb-1 lg:mb-0.5 shrink-0">
                     <button
                       onClick={() => {
                         if (!voiceOn) setVoiceOn(true);
@@ -204,7 +207,7 @@ export function Hero() {
                           cancelVoice();
                         }
                       }}
-                      className="text-[11px] text-muted-foreground hover:text-cyan inline-flex items-center gap-1.5 font-mono min-h-10 px-2 rounded-md"
+                      className="text-[11px] text-muted-foreground hover:text-cyan inline-flex items-center gap-1.5 font-mono min-h-8 px-2 rounded-md"
                       aria-label="toggle voice output"
                     >
                       {voiceOn ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
@@ -212,98 +215,102 @@ export function Hero() {
                     </button>
                   </div>
 
-                  {/* Hologram core */}
-                  <div className="relative aspect-square w-full max-w-[min(72vw,220px)] xs:max-w-[260px] sm:max-w-[340px] md:max-w-[440px] mx-auto">
-                    {/* Ambient glow */}
-                    <div className="absolute inset-0 rounded-full bg-cyan/10 blur-3xl" />
-                    <div className="absolute inset-[12%] rounded-full bg-emerald/10 blur-2xl" />
-
-                    {/* HUD rings */}
-                    <div className="absolute inset-0 grid place-items-center">
-                      <div className="absolute size-[96%] rounded-full border border-cyan/15 spin-slow" />
-                      <div
-                        className="absolute size-[82%] rounded-full border border-dashed border-cyan/25 spin-slow"
-                        style={{ animationDirection: "reverse", animationDuration: "22s" }}
-                      />
-                      <div
-                        className="absolute size-[68%] rounded-full border border-emerald/25 spin-slow"
-                        style={{ animationDuration: "30s" }}
-                      />
-                      <div className="absolute size-[54%] rounded-full border border-cyan/30" />
-
-                      {/* Tick marks */}
-                      <svg
-                        className="absolute size-[92%] text-cyan/40 spin-slow"
-                        style={{ animationDuration: "40s" }}
-                        viewBox="0 0 100 100"
-                        fill="none"
-                      >
-                        {Array.from({ length: 36 }).map((_, i) => (
-                          <line
-                            key={i}
-                            x1="50"
-                            y1="2"
-                            x2="50"
-                            y2={i % 3 === 0 ? "6" : "4"}
-                            stroke="currentColor"
-                            strokeWidth="0.4"
-                            transform={`rotate(${i * 10} 50 50)`}
-                          />
-                        ))}
-                      </svg>
-
-                      {/* Pulse ring on activity */}
-                      <div
-                        className={`absolute size-[58%] rounded-full bg-cyan/15 blur-2xl pulse-ring ${
-                          state === "listening" ? "!bg-cyan/40" : ""
-                        } ${state === "processing" ? "!bg-yellow-400/25" : ""}`}
-                      />
-
-                      {/* Micro HUD chips */}
-                      <div className="absolute top-2 left-2 font-mono text-[8px] sm:text-[9px] text-cyan/70 tracking-widest">
+                  {/* Hologram core — labels on outer frame; speaker inset for a small gap */}
+                  <div className="relative aspect-square w-full max-w-[min(92vw,300px)] xs:max-w-[320px] sm:max-w-[350px] md:max-w-[min(100%,380px)] lg:max-w-[min(100%,400px)] xl:max-w-[420px] mx-auto">
+                    {/* Micro HUD chips — fixed corners, left/right pairs share the same inset */}
+                    <div className="pointer-events-none absolute inset-x-2 top-2 sm:inset-x-2.5 sm:top-2.5 flex justify-between items-start gap-2">
+                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/70 tracking-widest leading-none">
                         SYS · 0x4A1F
-                      </div>
-                      <div className="absolute top-2 right-2 font-mono text-[8px] sm:text-[9px] text-emerald/80 tracking-widest">
+                      </span>
+                      <span className="font-mono text-[8px] sm:text-[9px] text-emerald/80 tracking-widest leading-none text-right">
                         ◉ LINK OK
-                      </div>
-                      <div className="absolute bottom-2 left-2 font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest">
+                      </span>
+                    </div>
+                    <div className="pointer-events-none absolute inset-x-2 bottom-2 sm:inset-x-2.5 sm:bottom-2.5 flex justify-between items-end gap-2">
+                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest leading-none">
                         FREQ 21.4kHz
-                      </div>
-                      <div className="absolute bottom-2 right-2 font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest">
+                      </span>
+                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest leading-none text-right">
                         CORE · STABLE
-                      </div>
+                      </span>
+                    </div>
 
-                      {/* Center mic */}
-                      <button
-                        onClick={state === "listening" ? stopListening : startListening}
-                        disabled={!supported || state === "processing" || state === "responding"}
-                        aria-label={state === "listening" ? "stop listening" : "start listening"}
-                        className={`relative size-[40%] rounded-full grid place-items-center transition-all
-                          bg-gradient-to-br from-cyan/50 via-cyan/15 to-emerald/40 glow-cyan float-orb
-                          ${state === "listening" ? "scale-[1.05]" : ""}
-                          ${!supported ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.03] cursor-pointer"}`}
-                      >
-                        <div className="size-[72%] rounded-full bg-background/70 backdrop-blur grid place-items-center border border-cyan/50">
-                          {state === "listening" ? (
-                            <Mic className="size-1/3 text-cyan animate-pulse" />
-                          ) : !supported ? (
-                            <MicOff className="size-1/3 text-muted-foreground" />
-                          ) : (
-                            <Mic className="size-1/3 text-cyan" />
-                          )}
-                        </div>
-                      </button>
+                    {/* Speaker + rings — inset leaves a thin gap before corner labels */}
+                    <div className="absolute inset-[9%] sm:inset-[8%] grid place-items-center">
+                      <div className="absolute inset-0 rounded-full bg-cyan/10 blur-3xl" />
+                      <div className="absolute inset-[12%] rounded-full bg-emerald/10 blur-2xl" />
+
+                      <div className="absolute inset-0 grid place-items-center">
+                        <div className="absolute size-[96%] rounded-full border border-cyan/15 spin-slow" />
+                        <div
+                          className="absolute size-[82%] rounded-full border border-dashed border-cyan/25 spin-slow"
+                          style={{ animationDirection: "reverse", animationDuration: "22s" }}
+                        />
+                        <div
+                          className="absolute size-[68%] rounded-full border border-emerald/25 spin-slow"
+                          style={{ animationDuration: "30s" }}
+                        />
+                        <div className="absolute size-[54%] rounded-full border border-cyan/30" />
+
+                        <svg
+                          className="absolute size-[92%] text-cyan/40 spin-slow"
+                          style={{ animationDuration: "40s" }}
+                          viewBox="0 0 100 100"
+                          fill="none"
+                        >
+                          {Array.from({ length: 36 }).map((_, i) => (
+                            <line
+                              key={i}
+                              x1="50"
+                              y1="2"
+                              x2="50"
+                              y2={i % 3 === 0 ? "6" : "4"}
+                              stroke="currentColor"
+                              strokeWidth="0.4"
+                              transform={`rotate(${i * 10} 50 50)`}
+                            />
+                          ))}
+                        </svg>
+
+                        <div
+                          className={`absolute size-[58%] rounded-full bg-cyan/15 blur-2xl pulse-ring ${
+                            state === "listening" ? "!bg-cyan/40" : ""
+                          } ${state === "processing" ? "!bg-yellow-400/25" : ""}`}
+                        />
+
+                        <button
+                          onClick={state === "listening" ? stopListening : startListening}
+                          disabled={!supported || state === "processing" || state === "responding"}
+                          aria-label={state === "listening" ? "stop listening" : "start listening"}
+                          className={`relative size-[48%] rounded-full grid place-items-center transition-all
+                            bg-gradient-to-br from-cyan/50 via-cyan/15 to-emerald/40 glow-cyan float-orb
+                            ${state === "listening" ? "scale-[1.05]" : ""}
+                            ${!supported ? "opacity-60 cursor-not-allowed" : "hover:scale-[1.03] cursor-pointer"}`}
+                        >
+                          <div className="size-[72%] rounded-full bg-background/70 backdrop-blur grid place-items-center border border-cyan/50">
+                            {state === "listening" ? (
+                              <Mic className="size-1/3 text-cyan animate-pulse" />
+                            ) : !supported ? (
+                              <MicOff className="size-1/3 text-muted-foreground" />
+                            ) : (
+                              <Mic className="size-1/3 text-cyan" />
+                            )}
+                          </div>
+                        </button>
+                      </div>
                     </div>
                   </div>
+                </div>
 
+                <div className="shrink-0 mt-auto">
                   {/* Status */}
-                  <div className="flex items-center justify-center gap-2 mt-2 font-mono text-[10px] sm:text-[11px] uppercase tracking-widest">
+                  <div className="flex items-center justify-center gap-2 mt-1.5 lg:mt-1 font-mono text-[10px] sm:text-[11px] uppercase tracking-widest">
                     <span className={`size-1.5 rounded-full ${statusMeta.dot} ${state !== "ready" ? "animate-pulse" : ""}`} />
                     <span className="text-muted-foreground">{statusMeta.label}</span>
                   </div>
 
                   {/* Transcript / response — borderless, just a soft surface */}
-                  <div className="mt-2 sm:mt-3 font-mono text-xs sm:text-sm min-h-[56px] sm:min-h-[80px] px-1 break-words">
+                  <div className="mt-1.5 sm:mt-2 lg:mt-1.5 font-mono text-xs sm:text-sm min-h-[48px] sm:min-h-[52px] lg:min-h-[44px] px-1 break-words">
                     <AnimatePresence mode="wait">
                       {transcript && (
                         <motion.div
@@ -344,7 +351,7 @@ export function Hero() {
                           key="hint"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="text-muted-foreground text-xs leading-relaxed text-center"
+                          className="text-muted-foreground text-[11px] sm:text-xs leading-snug text-center"
                         >
                           {supported
                             ? "Tap the mic and ask anything — projects, skills, contact. Or pick a suggestion below."
@@ -355,28 +362,30 @@ export function Hero() {
                   </div>
 
                   {/* Suggestions */}
-                  <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2 justify-center pb-0.5">
+                  <div className="mt-1.5 sm:mt-2 lg:mt-1.5 flex flex-wrap gap-1 sm:gap-1.5 justify-center pb-0">
                     {SUGGESTIONS.map((s) => (
                       <button
                         key={s}
                         onClick={() => handleQuery(s)}
-                        className="text-[10px] sm:text-[11px] px-2.5 sm:px-3 py-2 min-h-9 rounded-full border border-cyan/20 text-muted-foreground hover:text-cyan hover:border-cyan/50 transition-colors font-mono bg-background/30 backdrop-blur"
+                        className="text-[10px] sm:text-[11px] px-2 sm:px-2.5 py-1.5 min-h-8 rounded-full border border-cyan/20 text-muted-foreground hover:text-cyan hover:border-cyan/50 transition-colors font-mono bg-background/30 backdrop-blur"
                       >
                         {s}
                       </button>
                     ))}
                   </div>
+                </div>
               </motion.div>
 
               <motion.div
                 key="terminal"
                 initial={false}
-                animate={{
-                  opacity: mode === "terminal" ? 1 : 0,
-                  y: mode === "terminal" ? 0 : 4,
-                }}
+                animate={{ opacity: mode === "terminal" ? 1 : 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className={`flex flex-col w-full ${mode === "terminal" ? "relative" : "hidden"}`}
+                className={`flex h-full min-h-full flex-col w-full ${
+                  mode === "terminal"
+                    ? "relative z-10"
+                    : "absolute inset-0 z-0 opacity-0 pointer-events-none"
+                }`}
                 aria-hidden={mode !== "terminal"}
               >
                 <HeroTerminal content={content} />
@@ -418,7 +427,7 @@ function runHeroCommand(cmd: string, content: PortfolioContent): string[] {
   if (c === "experience")
     return experience.map((e) => `▸ ${e.role} @ ${e.company}  (${e.duration})`);
   if (c === "resume") {
-    window.open(resumeUrl, "_blank", "noopener,noreferrer");
+    window.open(resolveResumeUrl(resumeUrl), "_blank", "noopener,noreferrer");
     return ["opening resume.pdf in a new tab..."];
   }
   if (c === "contact")
@@ -495,7 +504,7 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden scanline bg-background/40 backdrop-blur-md ring-1 ring-cyan/15 flex flex-col w-full min-h-[220px] sm:min-h-[280px] h-[min(340px,52dvh)] sm:h-[min(400px,58dvh)] lg:h-[min(440px,58dvh)]"
+      className="relative rounded-2xl overflow-hidden scanline bg-background/40 backdrop-blur-md ring-1 ring-cyan/15 flex flex-col w-full h-full min-h-[220px] sm:min-h-[260px] lg:min-h-0"
       onClick={() => inputRef.current?.focus({ preventScroll: true })}
     >
       {/* Title bar */}

@@ -149,7 +149,7 @@ TanStack Router uses file-based routes. Portfolio content is loaded in route loa
 ## Features
 
 - **Dynamic portfolio** — Edit profile, projects, skills, and experience from `/admin`, stored in D1
-- **Contact form** — Validated server-side with Zod, saved to D1
+- **Contact form** — Validated server-side with Zod, emailed to your Admin → Profile email via Resend, archived in D1
 - **JARVIS voice assistant** — Deepgram STT + TTS, portfolio-aware replies via Gemini/Cohere or static fallback
 - **AI config** — Admin can store Gemini/Cohere API keys and choose a primary model; keys are admin-only
 - **Interactive terminal** — Client-side command simulation on the homepage (static, not AI-powered)
@@ -236,6 +236,8 @@ Copy `Anurag313y/.dev.vars.example` to `Anurag313y/.dev.vars`:
 |---|---|---|
 | `ADMIN_EMAIL` | Yes | Admin login email |
 | `ADMIN_PASSWORD` | Yes | Admin login password |
+| `RESEND_API_KEY` | For contact form | Sends contact messages to **Admin → Profile & Contact** email |
+| `RESEND_FROM` | Recommended | Verified sender, e.g. `Portfolio <hello@yourdomain.com>` |
 | `DEEPGRAM_API_KEY` | For voice | JARVIS STT + TTS + auth grant |
 | `GEMINI_API_KEY` | Optional | AI replies (or set in admin UI) |
 | `COHERE_API_KEY` | Optional | AI replies (or set in admin UI) |
@@ -248,10 +250,14 @@ Never commit `.dev.vars` to Git — it is already in `.gitignore`.
 cd Anurag313y
 wrangler secret put ADMIN_EMAIL
 wrangler secret put ADMIN_PASSWORD
+wrangler secret put RESEND_API_KEY
+wrangler secret put RESEND_FROM       # optional but required for custom domains
 wrangler secret put DEEPGRAM_API_KEY
 wrangler secret put GEMINI_API_KEY    # optional
 wrangler secret put COHERE_API_KEY    # optional
 ```
+
+**Contact form:** Create a [Resend](https://resend.com) API key, verify your sending domain, and set `RESEND_FROM`. Submissions are emailed to the address in **Admin → Profile & Contact** (not `ADMIN_EMAIL`) and also stored in D1 `contact_messages`.
 
 **Admin UI (API panel)** — stored in D1, never in public content:
 
@@ -505,6 +511,7 @@ cd Anurag313y
 # One-time: set production secrets
 wrangler secret put ADMIN_EMAIL
 wrangler secret put ADMIN_PASSWORD
+wrangler secret put RESEND_API_KEY
 wrangler secret put DEEPGRAM_API_KEY
 
 # Apply remote migrations (before first deploy)

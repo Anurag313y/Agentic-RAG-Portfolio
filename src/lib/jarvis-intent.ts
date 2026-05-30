@@ -59,20 +59,20 @@ export function focusRoutingInstruction(
 ): string {
   switch (focus) {
     case "projects":
-      return `The user is asking about PROJECTS. You MUST name at least one project title from the Projects list and give a one-sentence description. Do NOT answer with only ${ownerName}'s job title, headline, or location. End with [SCROLL:projects] when listing projects.`;
+      return `The user is asking about PROJECTS. You MUST name at least one project title from the Projects list and give a one-sentence description. Do NOT answer with only ${ownerName}'s job title, headline, or location.`;
     case "skills":
-      return `The user is asking about SKILLS. List concrete technologies from the Skills section. End with [SCROLL:skills] when appropriate.`;
+      return `The user is asking about SKILLS. List concrete technologies from the Skills section.`;
     case "experience":
-      return `The user is asking about WORK EXPERIENCE or TOTAL YEARS OF EXPERIENCE. Use DERIVED FACTS for any year-count question — state the exact total years given there, never guess. For role questions, mention role, company, and duration from Experience. End with [SCROLL:experience] when appropriate.`;
+      return `The user is asking about WORK EXPERIENCE or TOTAL YEARS OF EXPERIENCE. Use DERIVED FACTS for any year-count question — state the exact total years given there, never guess. For role questions, mention role, company, and duration from Experience.`;
     case "contact":
-      return `The user wants CONTACT info. Give the email from portfolio data. End with [SCROLL:contact].`;
+      return `The user wants CONTACT info. Give the email from the data below.`;
     case "resume":
-      return `The user wants the RESUME. Say you are opening it. End with [OPEN_RESUME].`;
+      return `The user wants the RESUME. Confirm briefly and end with [OPEN_RESUME].`;
     case "about":
       return `The user wants a general INTRO about ${ownerName}. Use name, role, headline, and location — not a project list unless they also asked for projects.`;
     case "terminal":
-      return `The user asked about the terminal/console. End with [SCROLL:terminal].`;
+      return `The user asked about the terminal/console. Explain they can switch to terminal mode in the hero section.`;
     default:
-      return `Answer the user's question using only the knowledge base and portfolio data. If they ask about projects, skills, or experience, use those sections — not a generic bio.`;
+      return `Answer the user's question using the facts below. If they ask about projects, skills, or experience, use those sections — not a generic bio.`;
   }
 }

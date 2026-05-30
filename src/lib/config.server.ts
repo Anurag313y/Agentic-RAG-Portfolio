@@ -17,6 +17,10 @@ export function getServerSecrets() {
   };
 }
 
+export function getResendApiKey(): string | null {
+  return env.RESEND_API_KEY?.trim() || null;
+}
+
 function readEnvSecret(
   name: keyof Pick<Env, "DEEPGRAM_API_KEY" | "COHERE_API_KEY" | "GEMINI_API_KEY">,
 ): string | null {

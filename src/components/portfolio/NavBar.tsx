@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Terminal, Menu, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
+import { useActiveSection } from "@/hooks/use-active-section";
+
 const LINKS = [
   { id: "home", label: "~/home" },
   { id: "about", label: "~/about" },
@@ -10,11 +12,26 @@ const LINKS = [
   { id: "experience", label: "~/experience" },
   { id: "resume", label: "~/resume" },
   { id: "contact", label: "~/contact" },
-];
+] as const;
+
+const SECTION_IDS = LINKS.map((l) => l.id);
+
+function navLinkClass(isActive: boolean) {
+  return isActive
+    ? "px-3 py-1.5 rounded-md text-cyan bg-cyan/10 border border-cyan/25 transition-colors"
+    : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors";
+}
+
+function mobileLinkClass(isActive: boolean) {
+  return isActive
+    ? "block px-4 py-3 min-h-11 rounded-lg text-cyan bg-cyan/10 border border-cyan/20 transition-colors"
+    : "block px-4 py-3 min-h-11 rounded-lg text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors";
+}
 
 export function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const activeId = useActiveSection([...SECTION_IDS]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -23,7 +40,6 @@ export function NavBar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Close mobile menu on resize to desktop
   useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 1024) setMobileOpen(false);
@@ -32,14 +48,15 @@ export function NavBar() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (mobileOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
   return (
@@ -67,14 +84,10 @@ export function NavBar() {
             </span>
           </a>
 
-          {/* Desktop links */}
           <ul className="hidden lg:flex items-center gap-1 font-mono text-xs">
             {LINKS.map((l) => (
               <li key={l.id}>
-                <a
-                  href={`#${l.id}`}
-                  className="px-3 py-1.5 rounded-md text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors"
-                >
+                <a href={`#${l.id}`} className={navLinkClass(activeId === l.id)}>
                   {l.label}
                 </a>
               </li>
@@ -89,7 +102,6 @@ export function NavBar() {
               sudo hire-me
             </a>
 
-            {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="lg:hidden touch-target size-11 grid place-items-center rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
@@ -100,7 +112,6 @@ export function NavBar() {
           </div>
         </nav>
 
-        {/* Mobile menu overlay */}
         <AnimatePresence>
           {mobileOpen && (
             <motion.div
@@ -116,7 +127,7 @@ export function NavBar() {
                     <a
                       href={`#${l.id}`}
                       onClick={() => setMobileOpen(false)}
-                      className="block px-4 py-3 min-h-11 rounded-lg text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors"
+                      className={mobileLinkClass(activeId === l.id)}
                     >
                       {l.label}
                     </a>

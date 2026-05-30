@@ -5,6 +5,7 @@ import {
   isCareerYearsQuestion,
 } from "./jarvis-facts.server";
 import { detectJarvisFocus } from "./jarvis-intent";
+import { sanitizeJarvisUserFacingText } from "./jarvis-speech";
 
 export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisReply {
   const { profile, projects, skills, experience, resumeUrl } = content;
@@ -27,7 +28,6 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
     if (wantsOne) {
       return {
         text: `One of ${profile.name}'s projects is ${pick.title}: ${pick.description}`,
-        actions: { scrollTo: "projects" },
       };
     }
     const top = visible
@@ -35,8 +35,7 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       .map((p) => p.title)
       .join(", ");
     return {
-      text: `His top projects include ${top}. Scrolling to the projects section now.`,
-      actions: { scrollTo: "projects" },
+      text: `His top projects include ${top}.`,
     };
   }
 
@@ -52,15 +51,13 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       .slice(0, 8)
       .join(", ");
     return {
-      text: `Strongest skills: ${flat}, and more. Showing the full stack now.`,
-      actions: { scrollTo: "skills" },
+      text: `Strongest skills: ${flat}, and more.`,
     };
   }
 
   if (focus === "contact") {
     return {
-      text: `Easiest path: email ${profile.email}. Opening the contact channel.`,
-      actions: { scrollTo: "contact" },
+      text: `Easiest path: email ${profile.email}.`,
     };
   }
 
@@ -76,7 +73,6 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       const metrics = computeCareerMetrics(content);
       return {
         text: buildCareerYearsReply(content, metrics),
-        actions: { scrollTo: "experience" },
       };
     }
     const latest = experience[0];
@@ -84,15 +80,13 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       ? `${latest.role} at ${latest.company} (${latest.duration})`
       : "his roles on the site";
     return {
-      text: `His latest role is ${summary}. Scrolling to experience now.`,
-      actions: { scrollTo: "experience" },
+      text: `His latest role is ${summary}.`,
     };
   }
 
   if (focus === "terminal") {
     return {
-      text: "Launching the developer console.",
-      actions: { scrollTo: "terminal" },
+      text: "You can use the terminal mode in the hero section for interactive commands.",
     };
   }
 
@@ -103,26 +97,12 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
 }
 
 function parseJarvisActions(text: string): JarvisAction | undefined {
-  const actions: JarvisAction = {};
-  const scrollMatch = text.match(/\[SCROLL:(projects|skills|contact|experience|terminal)\]/i);
-  if (scrollMatch) {
-    actions.scrollTo = scrollMatch[1]!.toLowerCase() as JarvisAction["scrollTo"];
-  }
-  if (/\[OPEN_RESUME\]/i.test(text)) {
-    actions.openResume = true;
-  }
-  return Object.keys(actions).length > 0 ? actions : undefined;
-}
-
-export function stripActionMarkers(text: string): string {
-  return text
-    .replace(/\[SCROLL:(projects|skills|contact|experience|terminal)\]/gi, "")
-    .replace(/\[OPEN_RESUME\]/gi, "")
-    .trim();
+  if (!/\[OPEN_RESUME\]/i.test(text)) return undefined;
+  return { openResume: true };
 }
 
 export function enrichLlmReply(raw: string): JarvisReply {
   const actions = parseJarvisActions(raw);
-  const text = stripActionMarkers(raw);
+  const text = sanitizeJarvisUserFacingText(raw);
   return actions ? { text, actions } : { text };
 }

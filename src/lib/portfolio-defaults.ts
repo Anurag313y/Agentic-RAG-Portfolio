@@ -19,12 +19,18 @@ export const DEFAULT_ADMIN_CONTENT: AdminContent = {
   ...DEFAULT_PORTFOLIO_CONTENT,
   geminiApiKey: "",
   cohereApiKey: "",
+  deepgramApiKey: "",
   jarvisKnowledgeBase: "",
 };
 
 export function toPublicContent(content: AdminContent): PortfolioContent {
-  const { geminiApiKey: _g, cohereApiKey: _c, jarvisKnowledgeBase: _k, ...publicContent } =
-    content;
+  const {
+    geminiApiKey: _g,
+    cohereApiKey: _c,
+    deepgramApiKey: _d,
+    jarvisKnowledgeBase: _k,
+    ...publicContent
+  } = content;
   return publicContent;
 }
 

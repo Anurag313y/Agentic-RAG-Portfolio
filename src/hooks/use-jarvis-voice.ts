@@ -11,6 +11,7 @@ import { applyJarvisActions } from "@/lib/jarvis-actions";
 import type { JarvisChatMessage } from "@/lib/content.types";
 import {
   base64ToUint8Array,
+  sanitizeJarvisUserFacingText,
   splitTextForTts,
   textForJarvisSpeech,
 } from "@/lib/jarvis-speech";
@@ -62,7 +63,8 @@ export function useJarvisVoice(resumeUrl: string) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const loadConfig = async () => {
       try {
         const config = await getJarvisConfig();
         if (cancelled) return;
@@ -72,9 +74,17 @@ export function useJarvisVoice(resumeUrl: string) {
       } catch {
         if (!cancelled) setSupported(false);
       }
-    })();
+    };
+
+    void loadConfig();
+    const onFocus = () => {
+      void loadConfig();
+    };
+    window.addEventListener("focus", onFocus);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
@@ -180,16 +190,17 @@ export function useJarvisVoice(resumeUrl: string) {
           },
         });
 
+        const displayText = sanitizeJarvisUserFacingText(reply.text);
+
         historyRef.current = [
           ...historyRef.current.slice(-10),
           { role: "user", content: trimmed },
-          { role: "assistant", content: reply.text },
+          { role: "assistant", content: displayText },
         ];
-
-        setResponse(reply.text);
+        setResponse(displayText);
         setState("responding");
         applyJarvisActions(reply.actions, resumeUrl);
-        await playSpeech(reply.text);
+        await playSpeech(displayText);
         if (!voiceOn) {
           setTimeout(() => setState("ready"), 1800);
         }

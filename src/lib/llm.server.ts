@@ -1,5 +1,4 @@
 import type { AdminContent, JarvisChatMessage, JarvisReply } from "./content.types";
-import { getCohereApiKey, getGeminiApiKey } from "./config.server";
 import {
   buildCareerYearsReply,
   buildDerivedFactsSection,
@@ -13,22 +12,13 @@ import {
   focusRoutingInstruction,
   type JarvisFocus,
 } from "./jarvis-intent";
-
-function resolveLlmKeys(content: AdminContent): {
-  geminiApiKey: string | null;
-  cohereApiKey: string | null;
-} {
-  return {
-    geminiApiKey: content.geminiApiKey?.trim() || getGeminiApiKey(),
-    cohereApiKey: content.cohereApiKey?.trim() || getCohereApiKey(),
-  };
-}
+import { resolveLlmKeys } from "./secrets.server";
 
 /** Prefer Cohere/Gemini when API keys exist; avoids silent static mode in production. */
-function resolveEffectiveModel(content: AdminContent): AdminContent["primaryModel"] {
+async function resolveEffectiveModel(content: AdminContent): Promise<AdminContent["primaryModel"]> {
   const configured = content.primaryModel ?? "static";
   if (configured !== "static") return configured;
-  const { cohereApiKey, geminiApiKey } = resolveLlmKeys(content);
+  const { cohereApiKey, geminiApiKey } = await resolveLlmKeys(content);
   if (cohereApiKey) return "cohere";
   if (geminiApiKey) return "gemini";
   return "static";
@@ -81,13 +71,13 @@ ${expLines || "(none)"}`;
 function buildFewShotExamples(ownerName: string): string {
   return `EXAMPLES (follow this style):
 User: "Tell me one of ${ownerName}'s projects"
-Assistant: "One of ${ownerName}'s projects is Sentinel — an observability platform for real-time logs and metrics. [SCROLL:projects]"
+Assistant: "One of ${ownerName}'s projects is Sentinel — an observability platform for real-time logs and metrics."
 
 User: "Who is ${ownerName}?"
 Assistant: "${ownerName} is a software engineer based in India, focused on fast and reliable full-stack work."
 
 User: "What are his skills?"
-Assistant: "He works with React, TypeScript, Node.js, and Linux tooling among others. [SCROLL:skills]"`;
+Assistant: "He works with React, TypeScript, Node.js, and Linux tooling among others."`;
 }
 
 function buildSystemPrompt(
@@ -98,8 +88,10 @@ function buildSystemPrompt(
 ): string {
   const hasKb = Boolean(content.jarvisKnowledgeBase?.trim());
   const sourceRule = hasKb
-    ? "Only answer using DERIVED FACTS, KNOWLEDGE BASE, and PORTFOLIO DATA below. Do not invent facts. If the answer is not there, say you do not have that information and suggest email contact."
-    : "Only answer using DERIVED FACTS and portfolio data below. If unsure, suggest viewing projects or contacting via email.";
+    ? "Use only the facts in DERIVED FACTS, KNOWLEDGE BASE, and PORTFOLIO DATA below. Do not invent facts. If the answer is not there, say you do not have that information and suggest email contact."
+    : "Use only the facts in DERIVED FACTS and PORTFOLIO DATA below. If unsure, suggest contacting via email.";
+
+  const voiceStyleRule = `Never mention where information came from (no "knowledge base", "portfolio data", "derived facts", "according to", "on this site", or similar). Never say you are scrolling, showing, opening sections, or navigating — give direct answers only.`;
 
   const routing = focusRoutingInstruction(focus, content.profile.name);
   const careerYearsBlock = isCareerYearsQuestion(userMessage)
@@ -110,15 +102,14 @@ function buildSystemPrompt(
 Speak as a helpful AI assistant referring to the portfolio owner in third person (e.g. "${content.profile.name}'s project...").
 Keep answers SHORT for voice: 1-3 sentences unless the user asks for detail.
 ${sourceRule}
+${voiceStyleRule}
 
 CURRENT QUESTION ROUTING (mandatory):
 ${routing}
 ${careerYearsBlock}
 Do NOT confuse a project question with a bio/intro: if they ask about projects, name a project title — never reply with only headline or location.
 
-For navigation, append invisible markers at the END of your reply when appropriate (user won't hear them read aloud if stripped):
-- [SCROLL:projects] [SCROLL:skills] [SCROLL:contact] [SCROLL:experience] [SCROLL:terminal]
-- [OPEN_RESUME] to open the resume PDF
+When the user wants the resume PDF, you may append [OPEN_RESUME] at the very end (it is stripped before display).
 
 ${buildFewShotExamples(content.profile.name)}
 
@@ -234,7 +225,6 @@ function groundedCareerYearsReply(content: AdminContent): JarvisReply {
   const metrics = computeCareerMetrics(content);
   return {
     text: buildCareerYearsReply(content, metrics),
-    actions: { scrollTo: "experience" },
   };
 }
 
@@ -260,14 +250,14 @@ export async function generateJarvisReply(
   history: JarvisChatMessage[],
   content: AdminContent,
 ): Promise<JarvisReply> {
-  const model = resolveEffectiveModel(content);
+  const model = await resolveEffectiveModel(content);
   const trimmed = message.trim();
   if (!trimmed) {
     return staticJarvisAnswer("", content);
   }
 
   const metrics = computeCareerMetrics(content);
-  const { geminiApiKey, cohereApiKey } = resolveLlmKeys(content);
+  const { geminiApiKey, cohereApiKey } = await resolveLlmKeys(content);
   const focus = detectJarvisFocus(trimmed);
   const systemPrompt = buildSystemPrompt(content, focus, metrics, trimmed);
   const cohereTemperature = isCareerYearsQuestion(trimmed) ? 0.05 : 0.15;

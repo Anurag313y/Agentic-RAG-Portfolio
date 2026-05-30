@@ -20,6 +20,7 @@ const adminContentSchema = z.object({
   resumeUrl: z.string(),
   geminiApiKey: z.string().optional(),
   cohereApiKey: z.string().optional(),
+  deepgramApiKey: z.string().optional(),
   primaryModel: z.enum(["gemini", "cohere", "static"]).optional(),
   jarvisEnabled: z.boolean().optional(),
   deepgramSttModel: z.string().optional(),

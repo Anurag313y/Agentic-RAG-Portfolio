@@ -1,4 +1,4 @@
-import { isDeepgramConfigured } from "./config.server";
+import { isDeepgramConfiguredForContent, resolveDeepgramApiKey } from "./secrets.server";
 import { fetchAdminContent } from "./content.server";
 import { grantDeepgramAccessToken, synthesizeSpeech, transcribeAudio } from "./deepgram.server";
 import type { JarvisChatMessage, JarvisReply } from "./content.types";
@@ -16,7 +16,7 @@ export async function getJarvisStatus(): Promise<{
   const content = await fetchAdminContent();
   return {
     enabled: content.jarvisEnabled !== false,
-    deepgramConfigured: isDeepgramConfigured(),
+    deepgramConfigured: await isDeepgramConfiguredForContent(content),
     sttModel: content.deepgramSttModel ?? "nova-3",
     ttsModel: content.deepgramTtsModel ?? "aura-2-thalia-en",
   };
@@ -32,10 +32,11 @@ export async function issueDeepgramToken(): Promise<{
   if (content.jarvisEnabled === false) {
     throw new Error("JARVIS_DISABLED");
   }
-  if (!isDeepgramConfigured()) {
+  const apiKey = await resolveDeepgramApiKey(content);
+  if (!apiKey) {
     throw new Error("DEEPGRAM_NOT_CONFIGURED");
   }
-  const { accessToken, expiresIn } = await grantDeepgramAccessToken(60);
+  const { accessToken, expiresIn } = await grantDeepgramAccessToken(apiKey, 60);
   return {
     accessToken,
     expiresIn,
@@ -65,11 +66,12 @@ export async function transcribeJarvisAudio(
   if (content.jarvisEnabled === false) {
     throw new Error("JARVIS_DISABLED");
   }
-  if (!isDeepgramConfigured()) {
+  const apiKey = await resolveDeepgramApiKey(content);
+  if (!apiKey) {
     throw new Error("DEEPGRAM_NOT_CONFIGURED");
   }
   const model = content.deepgramSttModel ?? "nova-3";
-  const transcript = await transcribeAudio(audioBase64, mimeType, model);
+  const transcript = await transcribeAudio(apiKey, audioBase64, mimeType, model);
   return { transcript };
 }
 
@@ -82,8 +84,12 @@ export async function jarvisTextToSpeech(text: string): Promise<{
   if (content.jarvisEnabled === false) {
     throw new Error("JARVIS_DISABLED");
   }
+  const apiKey = await resolveDeepgramApiKey(content);
+  if (!apiKey) {
+    throw new Error("DEEPGRAM_NOT_CONFIGURED");
+  }
   const model = content.deepgramTtsModel ?? "aura-2-thalia-en";
-  return synthesizeSpeech(text, model);
+  return synthesizeSpeech(apiKey, text, model);
 }
 
 export function mapJarvisError(error: unknown): string {
@@ -95,16 +101,16 @@ export function mapJarvisError(error: unknown): string {
       return "JARVIS voice is temporarily disabled.";
     }
     if (error.message === "DEEPGRAM_NOT_CONFIGURED") {
-      return "Voice is not configured on the server yet.";
+      return "Voice is not configured yet. Add your Deepgram API key in Admin → API Configuration.";
     }
     if (error.message === "DEEPGRAM_AUTH_INVALID") {
-      return "Deepgram API key is invalid or expired. Create a new key at console.deepgram.com and update DEEPGRAM_API_KEY in Anurag313y/.dev.vars, then restart npm run dev.";
+      return "Deepgram API key is invalid or expired. Update it in Admin → API Configuration.";
     }
     if (error.message === "DEEPGRAM_MODEL_INVALID") {
       return "Deepgram STT model name is invalid. In Admin → API Configuration set deepgram STT model to nova-3 (or nova-2).";
     }
     if (error.message === "DEEPGRAM_GRANT_FAILED") {
-      return "Deepgram token error. Using server transcription instead — restart and try again.";
+      return "Deepgram token error. Using server transcription instead — try again.";
     }
     if (error.message === "DEEPGRAM_SPEAK_FAILED") {
       return "Could not generate voice audio. Check your Deepgram API key and TTS model.";

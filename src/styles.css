@@ -239,6 +239,22 @@
   @keyframes spin-slow { to { transform: rotate(360deg); } }
   .spin-slow { animation: spin-slow 18s linear infinite; }
 
+  .section-py {
+    padding-block: 2rem;
+  }
+
+  @media (min-width: 40rem) {
+    .section-py {
+      padding-block: 2.75rem;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .section-py {
+      padding-block: 3.5rem;
+    }
+  }
+
   .section-container {
     margin-inline: auto;
     width: 100%;

@@ -34,6 +34,7 @@ export const JARVIS_KNOWLEDGE_BASE_MAX = 24_000;
 export type AdminContent = PortfolioContent & {
   geminiApiKey?: string;
   cohereApiKey?: string;
+  deepgramApiKey?: string;
   /** Personal facts, FAQs, hobbies, goals — injected into the LLM system prompt. */
   jarvisKnowledgeBase?: string;
 };

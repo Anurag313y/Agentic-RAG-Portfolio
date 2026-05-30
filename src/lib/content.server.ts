@@ -10,7 +10,8 @@ import {
   sessionExpiryMs,
   verifyPassword,
 } from "./auth.server";
-import { invalidateContentCache, readContentCache, writeContentCache } from "./cache.server";
+import { invalidateContentCache, readContentCache, writeContentCache, writeAdminSecretsKv, setSecretsMemory, ensureAdminSecretsKv } from "./cache.server";
+import { secretsFromContent } from "./secrets.server";
 import type { AdminContent, PortfolioContent } from "./content.types";
 import { getDb } from "./db.server";
 import {
@@ -61,7 +62,23 @@ async function readContentFromDb(): Promise<AdminContent | null> {
     .where(eq(portfolioContent.id, CONTENT_ROW_ID))
     .get();
   if (!row) return null;
-  return mergeContent(JSON.parse(row.data));
+  const content = mergeContent(JSON.parse(row.data));
+  setSecretsMemory(secretsFromContent(content));
+  return content;
+}
+
+async function bootstrapSecretsKv(content: AdminContent): Promise<void> {
+  await ensureAdminSecretsKv(secretsFromContent(content));
+}
+
+function preserveAdminSecrets(incoming: AdminContent, existing: AdminContent | null): AdminContent {
+  if (!existing) return incoming;
+  return {
+    ...incoming,
+    deepgramApiKey: incoming.deepgramApiKey?.trim() || existing.deepgramApiKey || "",
+    cohereApiKey: incoming.cohereApiKey?.trim() || existing.cohereApiKey || "",
+    geminiApiKey: incoming.geminiApiKey?.trim() || existing.geminiApiKey || "",
+  };
 }
 
 export async function fetchPublicContent(): Promise<PortfolioContent> {
@@ -83,21 +100,28 @@ export async function fetchPublicContent(): Promise<PortfolioContent> {
 export async function fetchAdminContent(): Promise<AdminContent> {
   await ensureContentSeeded();
   const fromDb = await readContentFromDb();
-  return fromDb ?? DEFAULT_ADMIN_CONTENT;
+  const content = fromDb ?? DEFAULT_ADMIN_CONTENT;
+  await bootstrapSecretsKv(content);
+  return content;
 }
 
 export async function saveAdminContent(content: AdminContent): Promise<PortfolioContent> {
   const db = getDb();
   const now = Date.now();
-  const payload = JSON.stringify(content);
+  const existing = await readContentFromDb();
+  const payloadContent = preserveAdminSecrets(content, existing);
+  const payload = JSON.stringify(payloadContent);
+  const secrets = secretsFromContent(payloadContent);
+  setSecretsMemory(secrets);
+  await writeAdminSecretsKv(secrets);
 
-  const existing = await db
+  const existingRow = await db
     .select()
     .from(portfolioContent)
     .where(eq(portfolioContent.id, CONTENT_ROW_ID))
     .get();
 
-  if (existing) {
+  if (existingRow) {
     await db
       .update(portfolioContent)
       .set({ data: payload, updatedAt: now })
@@ -110,7 +134,7 @@ export async function saveAdminContent(content: AdminContent): Promise<Portfolio
     });
   }
 
-  const publicContent = toPublicContent(content);
+  const publicContent = toPublicContent(payloadContent);
   await invalidateContentCache();
   await writeContentCache(publicContent);
   return publicContent;

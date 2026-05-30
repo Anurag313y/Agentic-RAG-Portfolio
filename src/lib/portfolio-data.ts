@@ -53,6 +53,8 @@ export const PROJECTS = [
     features: ["Live log tailing", "Custom alerting", "Trace correlation"],
     github: "https://github.com/anuragyadav/sentinel",
     demo: "https://sentinel.demo.dev",
+    imageUrl:
+      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80",
   },
   {
     title: "Orbit — Cloud File Sync",
@@ -62,6 +64,8 @@ export const PROJECTS = [
     features: ["E2E encryption", "Delta sync", "Offline-first"],
     github: "https://github.com/anuragyadav/orbit",
     demo: "https://orbit.demo.dev",
+    imageUrl:
+      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=400&q=80",
   },
   {
     title: "Forge — CI Pipeline Runner",
@@ -71,6 +75,8 @@ export const PROJECTS = [
     features: ["Matrix builds", "Caching layer", "GitHub integration"],
     github: "https://github.com/anuragyadav/forge",
     demo: "https://forge.demo.dev",
+    imageUrl:
+      "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80",
   },
   {
     title: "Nimbus — AI Chat Workspace",
@@ -80,6 +86,8 @@ export const PROJECTS = [
     features: ["Shared threads", "Prompt library", "RBAC"],
     github: "https://github.com/anuragyadav/nimbus",
     demo: "https://nimbus.demo.dev",
+    imageUrl:
+      "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=400&q=80",
   },
 ];
 

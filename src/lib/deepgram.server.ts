@@ -1,5 +1,3 @@
-import { getDeepgramApiKey } from "./config.server";
-
 const DEEPGRAM_BASE = "https://api.deepgram.com";
 
 /** Strip `;codecs=opus` etc. — Deepgram pre-recorded API expects a simple audio MIME. */
@@ -39,23 +37,26 @@ function mapDeepgramHttpError(status: number, body: string, context: "listen" | 
   throw new Error("DEEPGRAM_GRANT_FAILED");
 }
 
-function requireDeepgramKey(): string {
-  const key = getDeepgramApiKey();
+function requireDeepgramKey(apiKey: string | null | undefined): string {
+  const key = apiKey?.trim();
   if (!key) {
     throw new Error("DEEPGRAM_NOT_CONFIGURED");
   }
   return key;
 }
 
-export async function grantDeepgramAccessToken(ttlSeconds = 60): Promise<{
+export async function grantDeepgramAccessToken(
+  apiKey: string | null | undefined,
+  ttlSeconds = 60,
+): Promise<{
   accessToken: string;
   expiresIn: number;
 }> {
-  const apiKey = requireDeepgramKey();
+  const key = requireDeepgramKey(apiKey);
   const res = await fetch(`${DEEPGRAM_BASE}/v1/auth/grant`, {
     method: "POST",
     headers: {
-      Authorization: `Token ${apiKey}`,
+      Authorization: `Token ${key}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ ttl_seconds: ttlSeconds }),
@@ -74,10 +75,11 @@ export async function grantDeepgramAccessToken(ttlSeconds = 60): Promise<{
 }
 
 export async function synthesizeSpeech(
+  apiKey: string | null | undefined,
   text: string,
   model: string,
 ): Promise<{ base64: string; mimeType: string }> {
-  const apiKey = requireDeepgramKey();
+  const key = requireDeepgramKey(apiKey);
   const trimmed = text.trim().slice(0, 2000);
   if (!trimmed) {
     throw new Error("EMPTY_TEXT");
@@ -91,7 +93,7 @@ export async function synthesizeSpeech(
   const res = await fetch(`${DEEPGRAM_BASE}/v1/speak?${params}`, {
     method: "POST",
     headers: {
-      Authorization: `Token ${apiKey}`,
+      Authorization: `Token ${key}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ text: trimmed }),
@@ -126,11 +128,12 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 export async function transcribeAudio(
+  apiKey: string | null | undefined,
   audioBase64: string,
   mimeType: string,
   model: string,
 ): Promise<string> {
-  const apiKey = requireDeepgramKey();
+  const key = requireDeepgramKey(apiKey);
   if (!audioBase64.trim()) {
     throw new Error("EMPTY_AUDIO");
   }
@@ -148,7 +151,7 @@ export async function transcribeAudio(
   const res = await fetch(`${DEEPGRAM_BASE}/v1/listen?${params}`, {
     method: "POST",
     headers: {
-      Authorization: `Token ${apiKey}`,
+      Authorization: `Token ${key}`,
       "Content-Type": contentType,
     },
     body: base64ToBytes(audioBase64),

@@ -47,15 +47,29 @@ export function Contact() {
       toast.success("Message sent — I'll get back to you soon.");
       setForm({ name: "", email: "", subject: "", message: "" });
       setTimeout(() => setSent(false), 4000);
-    } catch {
-      toast.error("Failed to send message. Please try again.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+      if (message.includes("Too many contact")) {
+        toast.error(message);
+      } else if (message.includes("RESEND_API_KEY") || message.includes("not configured")) {
+        toast.error(
+          "Add RESEND_API_KEY to .dev.vars (get one at resend.com/api-keys), then restart npm run dev.",
+          { duration: 8000 },
+        );
+      } else if (message.includes("Admin → Profile")) {
+        toast.error(message);
+      } else if (message && message.length < 160) {
+        toast.error(message);
+      } else {
+        toast.error("Failed to send message. Please try again or use the email link.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <section id="contact" className="py-12 sm:py-16 md:py-20">
+    <section id="contact" className="section-py scroll-mt-24">
       <div className="section-container">
         <SectionHeading
           id="contact"
@@ -63,9 +77,9 @@ export function Contact() {
           title="Let's build something"
           description="Open to impactful roles, freelance work, and meaningful products."
         />
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-4 sm:gap-6">
-          <div className="space-y-4 min-w-0">
-            <div className="glass rounded-2xl p-4 sm:p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-3 sm:gap-6">
+          <div className="space-y-3 sm:space-y-4 min-w-0">
+            <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-6">
               <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest">email</div>
               <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <a
@@ -84,9 +98,9 @@ export function Contact() {
               </div>
             </div>
 
-            <div className="glass rounded-2xl p-4 sm:p-6">
-              <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-3">social</div>
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
+            <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-6">
+              <div className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-2 sm:mb-3">social</div>
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 {[
                   { icon: Github, label: "GitHub", href: profile.socials.github },
                   { icon: Linkedin, label: "LinkedIn", href: profile.socials.linkedin },
@@ -98,7 +112,7 @@ export function Contact() {
                     href={s.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-3 min-h-11 rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors text-sm"
+                    className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-3 min-h-10 sm:min-h-11 rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors text-xs sm:text-sm"
                   >
                     <s.icon className="size-4" /> {s.label}
                   </a>
@@ -106,7 +120,7 @@ export function Contact() {
               </div>
             </div>
 
-            <div className="glass rounded-2xl p-4 sm:p-6 font-mono text-sm">
+            <div className="glass rounded-xl sm:rounded-2xl p-3 sm:p-6 font-mono text-xs sm:text-sm">
               <div className="text-emerald">$ status</div>
               <div className="text-muted-foreground pl-2 mt-1">
                 <div>● available for work</div>
@@ -116,8 +130,8 @@ export function Contact() {
             </div>
           </div>
 
-          <form onSubmit={submit} className="glass rounded-2xl p-4 sm:p-8 space-y-4 min-w-0">
-            <div className="grid sm:grid-cols-2 gap-4">
+          <form onSubmit={submit} className="glass rounded-xl sm:rounded-2xl p-3 sm:p-8 space-y-3 sm:space-y-4 min-w-0">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
               <label className="block">
                 <div className="text-xs font-mono text-muted-foreground mb-1.5">name</div>
                 <input
@@ -126,7 +140,7 @@ export function Contact() {
                   maxLength={120}
                   required
                   className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2.5 text-sm"
-                  placeholder="Ada Lovelace"
+                  placeholder="Your Name"
                 />
               </label>
               <label className="block">
@@ -138,7 +152,7 @@ export function Contact() {
                   maxLength={160}
                   required
                   className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2.5 text-sm"
-                  placeholder="you@company.com"
+                  placeholder="your@email.com"
                 />
               </label>
             </div>
@@ -160,13 +174,13 @@ export function Contact() {
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 maxLength={2000}
                 required
-                rows={6}
-                className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2.5 text-sm resize-y"
+                rows={4}
+                className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2 sm:py-2.5 text-sm resize-y sm:min-h-[9rem]"
                 placeholder="Tell me about your project, role, or idea…"
               />
             </label>
             <div className="font-mono text-[11px] text-muted-foreground">
-              // Stored securely — never exposed to the browser
+              Protected by spam filters and rate limits
             </div>
             <button
               type="submit"
