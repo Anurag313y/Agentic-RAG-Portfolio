@@ -1,6 +1,10 @@
 # My Intelligent Portfolio
 
-A full-stack personal portfolio with an admin dashboard, contact form, and JARVIS voice assistant. Built with TanStack Start and deployed on Cloudflare Workers.
+A full-stack personal portfolio with an admin dashboard, contact form, and JARVIS voice assistant. Built with **TanStack Start + React 19**, styled with **Tailwind v4 and shadcn/ui**, backed by **Cloudflare Workers, D1, and KV**, with **Drizzle ORM** and custom session auth — deployed via Wrangler.
+
+The main application lives in **`Anurag313y/`**. The repo root forwards scripts to that folder.
+
+This is a **full-stack SSR React app** deployed as a single Cloudflare Worker — not a separate frontend + backend.
 
 ---
 
@@ -22,7 +26,7 @@ npm install
 
 # 3. Set up environment variables
 copy .dev.vars.example .dev.vars
-# Edit .dev.vars with your admin email, password, and API keys
+# Edit .dev.vars — see Environment Variables section below
 
 # 4. Apply local database migrations
 npm run db:migrate:local
@@ -59,43 +63,72 @@ All application code is inside **`Anurag313y/`**. The repo root only contains wr
 
 ---
 
-## Environment Variables
+## Architecture
 
-Copy `Anurag313y/.dev.vars.example` to `Anurag313y/.dev.vars` and fill in:
+### System overview
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `ADMIN_EMAIL` | Yes | Admin login email |
-| `ADMIN_PASSWORD` | Yes | Admin login password |
-| `DEEPGRAM_API_KEY` | For voice | JARVIS speech-to-text and text-to-speech |
-| `GEMINI_API_KEY` | Optional | AI replies (or set in admin UI) |
-| `COHERE_API_KEY` | Optional | AI replies (or set in admin UI) |
+```
+                              ┌─────────────────────────┐
+                              │     Visitor / Admin     │
+                              └───────────┬─────────────┘
+                                          │
+                              ┌───────────▼─────────────┐
+                              │         Client          │
+                              │  React · Router · UI    │
+                              │  JARVIS voice interface │
+                              └───────────┬─────────────┘
+                                          │
+                          SSR + typed server functions
+                                          │
+                              ┌───────────▼─────────────┐
+                              │   Cloudflare Worker     │
+                              │    TanStack Start       │
+                              │  auth · content · API   │
+                              └───────────┬─────────────┘
+                    ┌─────────────────────┼─────────────────────┐
+                    │                     │                     │
+          ┌─────────▼─────────┐ ┌─────────▼─────────┐ ┌─────────▼─────────┐
+          │    D1 SQLite      │ │    KV cache       │ │  External APIs    │
+          │  portfolio · auth │ │  content · limits │ │ Deepgram · Gemini │
+          │  contact messages │ │                   │ │      Cohere       │
+          └───────────────────┘ └───────────────────┘ └───────────────────┘
+```
 
-Never commit `.dev.vars` to Git — it is already in `.gitignore`.
-
----
-
-## Available Scripts
-
-Run these from **`Anurag313y/`** (or use root shortcuts where noted):
-
-| Command | Description |
+| Layer | Role |
 |---|---|
-| `npm run dev` | Start local dev server |
-| `npm run build` | Production build |
-| `npm run deploy` | Build and deploy to Cloudflare |
-| `npm run db:migrate:local` | Apply D1 migrations locally |
-| `npm run db:migrate:remote` | Apply D1 migrations in production |
-| `npm run lint` | Run ESLint |
-| `npm run format` | Format code with Prettier |
+| **Client** | SSR React pages, admin dashboard, JARVIS mic UI |
+| **Worker** | Single edge app — routing, SSR, auth, and all business logic |
+| **D1** | Persistent data: portfolio content, sessions, contact messages |
+| **KV** | Fast cache for portfolio JSON and JARVIS rate limits |
+| **External APIs** | Speech and conversational AI — keys never sent to the browser |
 
-**From repo root:**
+### Application layers
 
-| Command | Description |
+| Layer | Technology / Location |
 |---|---|
-| `npm run dev` | Same as `cd Anurag313y && npm run dev` |
-| `npm run build` | Same as `cd Anurag313y && npm run build` |
-| `npm run db:migrate:local` | Same as above for migrations |
+| **Language** | TypeScript (strict, ES2022) |
+| **Framework** | TanStack Start + TanStack Router + TanStack React Query |
+| **Entry point** | `src/server.ts` → TanStack Start handler on Workers |
+| **API layer** | `createServerFn` in `src/lib/api/*.functions.ts` |
+| **Domain layer** | `src/lib/*.server.ts` (content, auth, jarvis, cache) |
+| **Data layer** | Drizzle ORM → D1 + KV |
+| **Build** | Vite 7 + `@cloudflare/vite-plugin` + Wrangler |
+
+### Data flow
+
+```
+Browser → TanStack Router loader / React Query
+       → createServerFn (portfolio · auth · contact · jarvis)
+       → content.server.ts / jarvis.server.ts
+       → D1 (via Drizzle) + KV cache
+```
+
+Portfolio content path:
+
+1. Read from KV cache when possible (5-min TTL)
+2. Fallback to D1
+3. Merged with defaults from `portfolio-defaults.ts`
+4. API keys (Gemini/Cohere) stripped before sending public content
 
 ---
 
@@ -109,14 +142,17 @@ Run these from **`Anurag313y/`** (or use root shortcuts where noted):
 
 Default admin credentials come from your `.dev.vars` file on first run.
 
+TanStack Router uses file-based routes. Portfolio content is loaded in route loaders and cached via React Query (5-minute stale time).
+
 ---
 
 ## Features
 
-- **Dynamic portfolio** — Edit profile, projects, skills, and experience from `/admin`
-- **Contact form** — Messages saved to the database
-- **JARVIS voice assistant** — Speak to the portfolio; get voice replies powered by Deepgram + Gemini/Cohere
-- **Interactive terminal** — Command-style UI section on the homepage
+- **Dynamic portfolio** — Edit profile, projects, skills, and experience from `/admin`, stored in D1
+- **Contact form** — Validated server-side with Zod, saved to D1
+- **JARVIS voice assistant** — Deepgram STT + TTS, portfolio-aware replies via Gemini/Cohere or static fallback
+- **AI config** — Admin can store Gemini/Cohere API keys and choose a primary model; keys are admin-only
+- **Interactive terminal** — Client-side command simulation on the homepage (static, not AI-powered)
 - **Resume download** — PDF served from `public/resume.pdf`
 - **Cloudflare-native** — Single Worker handles SSR, API, and static assets
 
@@ -124,60 +160,135 @@ Default admin credentials come from your `.dev.vars` file on first run.
 
 ## Tech Stack
 
-| Layer | Technology |
+### Core
+
+| Layer | Choice |
 |---|---|
-| Framework | TanStack Start + TanStack Router |
-| UI | React 19, Tailwind CSS v4, shadcn/ui |
-| Database | Cloudflare D1 (SQLite) + Drizzle ORM |
-| Cache | Cloudflare KV |
-| Hosting | Cloudflare Workers |
-| Build | Vite 7 + Wrangler |
-| Voice AI | Deepgram (STT/TTS) |
-| Chat AI | Google Gemini or Cohere (configurable in admin) |
+| **Full-stack framework** | TanStack Start |
+| **UI library** | React 19 |
+| **Hosting / runtime** | Cloudflare Workers (`nodejs_compat`) |
+| **Build tool** | Vite 7 |
+| **Database** | Cloudflare D1 (SQLite) |
+| **ORM** | Drizzle ORM |
+| **Cache** | Cloudflare KV (`PORTFOLIO_CACHE`) |
+
+### Frontend (UI)
+
+| Category | Stack |
+|---|---|
+| **Styling** | Tailwind CSS v4 (`@tailwindcss/vite`) |
+| **Design system** | shadcn/ui — New York style, Slate base, CSS variables |
+| **Primitives** | Radix UI (dialog, tabs, select, accordion, etc.) |
+| **Icons** | Lucide React |
+| **Animations** | Framer Motion (Hero, NavBar, sections) |
+| **Forms** | React Hook Form + Zod validators |
+| **Toasts** | Sonner |
+| **Charts** | Recharts (via shadcn `chart` component) |
+| **Utilities** | `clsx`, `tailwind-merge`, `class-variance-authority` |
+
+Tailwind v4 uses a custom theme in `styles.css` with **OKLCH colors** and dark mode via a `.dark` class.
+
+Other UI: **cmdk**, **vaul**, **embla-carousel**, **react-day-picker**, **input-otp**.
+
+### Backend & Cloudflare Services
+
+Configured in `wrangler.jsonc`:
+
+| Service | Purpose |
+|---|---|
+| **Cloudflare Workers** | Runs the SSR app |
+| **Cloudflare D1** | SQLite database (`portfolio-db`) |
+| **Cloudflare KV** | Portfolio content cache + JARVIS rate limits |
+| **Wrangler** | Local dev, deploy, D1 migrations, type generation |
+
+### Voice & Chat AI
+
+| Service | Purpose |
+|---|---|
+| **Deepgram** | Speech-to-text (live WebSocket) + text-to-speech |
+| **Google Gemini** | Portfolio-aware conversational replies |
+| **Cohere** | Alternative LLM (configurable in admin) |
+
+### Developer Tooling
+
+| Tool | Role |
+|---|---|
+| **Vite 7** | Dev server (port 5173), build |
+| **@cloudflare/vite-plugin** | Workers SSR integration |
+| **ESLint 9** | Linting (React Hooks, Prettier integration) |
+| **Prettier** | Formatting |
+| **drizzle-kit** | Schema migrations against D1 |
+| **TypeScript 5.8** | Strict type checking |
+
+### Validation & Types
+
+- **Zod** validates server function inputs (admin login, contact form, content updates)
+- Shared types in `content.types.ts`
+- Path alias `@/*` → `src/*`
 
 ---
 
-## JARVIS Voice Assistant
+## Environment Variables
 
-JARVIS lets visitors ask questions about the portfolio using their microphone.
+Copy `Anurag313y/.dev.vars.example` to `Anurag313y/.dev.vars`:
 
-**How it works:**
+| Variable | Required | Purpose |
+|---|---|---|
+| `ADMIN_EMAIL` | Yes | Admin login email |
+| `ADMIN_PASSWORD` | Yes | Admin login password |
+| `DEEPGRAM_API_KEY` | For voice | JARVIS STT + TTS + auth grant |
+| `GEMINI_API_KEY` | Optional | AI replies (or set in admin UI) |
+| `COHERE_API_KEY` | Optional | AI replies (or set in admin UI) |
 
-1. User speaks → Deepgram converts speech to text (browser WebSocket)
-2. Text is sent to the server → Gemini/Cohere generates a portfolio-aware reply
-3. Reply is converted to speech → Deepgram TTS plays natural voice audio
+Never commit `.dev.vars` to Git — it is already in `.gitignore`.
 
-**Setup:**
-
-1. Get a [Deepgram API key](https://console.deepgram.com/)
-2. Add it to `.dev.vars` as `DEEPGRAM_API_KEY`
-3. (Optional) Add `GEMINI_API_KEY` or configure AI keys in the admin panel under **API**
-
-JARVIS can be toggled on/off from the admin dashboard.
-
----
-
-## Deployment
+**Production (Cloudflare):**
 
 ```bash
 cd Anurag313y
-
-# Set production secrets (one-time)
 wrangler secret put ADMIN_EMAIL
 wrangler secret put ADMIN_PASSWORD
 wrangler secret put DEEPGRAM_API_KEY
-
-# Deploy
-npm run deploy
+wrangler secret put GEMINI_API_KEY    # optional
+wrangler secret put COHERE_API_KEY    # optional
 ```
 
-Before deploying to production, run remote migrations:
+**Admin UI (API panel)** — stored in D1, never in public content:
 
-```bash
-npm run db:migrate:remote
-```
+- `geminiApiKey`, `cohereApiKey`, `primaryModel` (`gemini` | `cohere` | `static`)
+- `jarvisEnabled` (kill switch)
+- `deepgramSttModel`, `deepgramTtsModel` (optional tuning)
 
-The Worker is named **`anurag-portfolio`** (see `wrangler.jsonc`).
+**Recommendation:** Keep `DEEPGRAM_API_KEY` in Wrangler secrets only, not in portfolio JSON.
+
+---
+
+## Available Scripts
+
+Run from **`Anurag313y/`** (or use root shortcuts):
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start local dev server |
+| `npm run build` | Production build |
+| `npm run deploy` | Build + deploy to Cloudflare |
+| `npm run db:migrate:local` | Apply D1 migrations locally |
+| `npm run db:migrate:remote` | Apply D1 migrations in production |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format code with Prettier |
+
+**From repo root:** `npm run dev`, `npm run build`, `npm run db:migrate:local` — all forward to `Anurag313y/`.
+
+---
+
+## Auth & Security
+
+Custom auth (no NextAuth/Clerk):
+
+- **Password hashing:** Web Crypto PBKDF2 (100k iterations, SHA-256)
+- **Sessions:** DB-backed sessions + HTTP-only cookie (`portfolio_session`, 7-day expiry)
+- **Secrets:** From `.dev.vars` (local) or `wrangler secret put` (production)
+- **Public vs admin data:** API keys stripped from public portfolio responses via `toPublicContent()`
 
 ---
 
@@ -192,227 +303,21 @@ D1 tables (defined in `Anurag313y/src/db/schema.ts`):
 | `sessions` | Login sessions |
 | `contact_messages` | Contact form submissions |
 
-Migrations are in `Anurag313y/drizzle/migrations/`.
+Migrations live in `Anurag313y/drizzle/migrations/` and are applied with `wrangler d1 migrations apply`.
 
 ---
 
-## Development Notes
+## JARVIS Voice Assistant
 
-- **Path alias:** `@/*` maps to `src/*` inside `Anurag313y/`
-- **Auth:** Custom session-based auth with PBKDF2 password hashing
-- **Public vs admin data:** API keys are stripped from public portfolio responses
-- **Rate limiting:** JARVIS endpoints are rate-limited per IP via Cloudflare KV
+JARVIS lets visitors ask questions about the portfolio using their microphone. Deepgram handles speech ↔ text; Gemini/Cohere (or static fallback) generates portfolio-aware replies. API keys are proxied through Cloudflare Workers — never exposed to the browser.
 
----
+**How it works:**
 
-## License
+1. User speaks → Deepgram converts speech to text (browser WebSocket + short-lived JWT)
+2. Text sent to server → Gemini/Cohere generates a portfolio-aware reply
+3. Reply converted to speech → Deepgram TTS plays natural voice audio
 
-Private project.
-
-##########################################
-# My Intelligent Portfolio
-
-A full-stack personal portfolio with an admin dashboard for editing content, contact form handling, and Cloudflare-native deployment.
-
-The main application lives in `Anurag313y/`. The repo root forwards scripts to that folder.
-
----
-
-## Tech Stack
-
-### Architecture at a Glance
-
-| Layer | Choice |
-|---|---|
-| **Language** | TypeScript (strict, ES2022) |
-| **Full-stack framework** | TanStack Start |
-| **Hosting / runtime** | Cloudflare Workers |
-| **Build tool** | Vite 7 |
-| **Database** | Cloudflare D1 (SQLite) |
-| **ORM** | Drizzle ORM |
-
-This is a **full-stack SSR React app** deployed as a single Cloudflare Worker — not a separate frontend + backend.
-
----
-
-### Core Framework & Routing
-
-**TanStack Start** powers the app end-to-end:
-
-- Server-side rendering (SSR)
-- Server functions via `createServerFn` (typed RPC-style API)
-- Entry point: `src/server.ts` → TanStack Start server handler on Workers
-
-**TanStack Router** handles routing with file-based routes:
-
-- `/` — public portfolio
-- `/admin` — admin dashboard
-- `/reset-password` — password reset
-
-**TanStack React Query** manages client-side data:
-
-- Portfolio content is loaded in route loaders and cached (5-minute stale time)
-- Integrated into the router context
-
----
-
-### Frontend (UI)
-
-| Category | Stack |
-|---|---|
-| **UI library** | React 19 |
-| **Styling** | Tailwind CSS v4 (`@tailwindcss/vite`) |
-| **Design system** | shadcn/ui — **New York** style, Slate base, CSS variables |
-| **Primitives** | Radix UI (dialog, tabs, select, accordion, etc.) |
-| **Icons** | Lucide React |
-| **Animations** | Framer Motion (Hero, NavBar, sections) |
-| **Forms** | React Hook Form + Zod validators |
-| **Toasts** | Sonner |
-| **Charts** | Recharts (via shadcn `chart` component) |
-| **Utilities** | `clsx`, `tailwind-merge`, `class-variance-authority` |
-
-Tailwind v4 uses a custom theme in `styles.css` with **OKLCH colors** and dark mode via a `.dark` class.
-
-Other UI pieces: **cmdk** (command palette), **vaul** (drawer), **embla-carousel**, **react-day-picker**, **input-otp**.
-
----
-
-### Backend & Cloudflare Services
-
-Configured in `wrangler.jsonc`:
-
-| Service | Purpose |
-|---|---|
-| **Cloudflare Workers** | Runs the SSR app (`nodejs_compat` enabled) |
-| **Cloudflare D1** | SQLite database (`portfolio-db`) |
-| **Cloudflare KV** | Portfolio content cache (`PORTFOLIO_CACHE`, 5-min TTL) |
-| **Wrangler** | Local dev, deploy, D1 migrations, type generation |
-
-**Drizzle ORM** maps to D1 with SQLite dialect. Tables:
-
-- `portfolio_content` — editable portfolio JSON
-- `admin_users` — admin accounts
-- `sessions` — session tokens
-- `contact_messages` — contact form submissions
-
-Migrations live in `drizzle/migrations/` and are applied with `wrangler d1 migrations apply`.
-
----
-
-### Auth & Security
-
-Custom auth (no NextAuth/Clerk/etc.):
-
-- **Password hashing**: Web Crypto PBKDF2 (100k iterations, SHA-256)
-- **Sessions**: DB-backed sessions + HTTP-only cookie (`portfolio_session`, 7-day expiry)
-- **Secrets**: `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `DEEPGRAM_API_KEY` from `.dev.vars` (local) or `wrangler secret put` (production)
-
----
-
-### Data Flow Pattern
-
-```
-Browser → TanStack Router loader / React Query
-       → createServerFn (portfolio.functions.ts, auth.functions.ts, contact.functions.ts)
-       → content.server.ts
-       → D1 (via Drizzle) + KV cache
-```
-
-Portfolio content is:
-
-1. Read from KV cache when possible
-2. Fallback to D1
-3. Merged with defaults from `portfolio-defaults.ts`
-4. API keys (Gemini/Cohere) are stripped before sending public content
-
----
-
-### Validation & Types
-
-- **Zod** validates server function inputs (admin login, contact form, content updates)
-- Shared types in `content.types.ts`
-- Path alias `@/*` → `src/*`
-
----
-
-### Developer Tooling
-
-| Tool | Role |
-|---|---|
-| **Vite 7** | Dev server (port 5173), build |
-| **@cloudflare/vite-plugin** | Workers SSR integration |
-| **ESLint 9** | Linting (React Hooks, Prettier integration) |
-| **Prettier** | Formatting |
-| **drizzle-kit** | Schema migrations against D1 |
-| **TypeScript 5.8** | Strict type checking |
-
----
-
-### App Features
-
-- **Dynamic portfolio** — content editable from `/admin`, stored in D1
-- **Contact form** — validated server-side, saved to D1
-- **Interactive terminal section** — client-side command simulation (static, not AI-powered today)
-- **JARVIS voice assistant** — Deepgram STT + TTS (natural voice), portfolio-aware replies via Gemini/Cohere or static fallback
-- **AI config hooks** — admin can store Gemini/Cohere API keys and choose a primary model; keys are admin-only and not exposed publicly
-- **Resume** — static PDF served from the client build
-
----
-
-### Deployment
-
-```bash
-npm run build   # Vite build
-npm run deploy  # build + wrangler deploy (from Anurag313y/)
-```
-
-The Worker is named `anurag-portfolio` with observability enabled.
-
----
-
-### Summary
-
-**A TypeScript full-stack portfolio built with TanStack Start + React 19, styled with Tailwind v4 and shadcn/ui, backed by Cloudflare Workers, D1, and KV, with Drizzle ORM and custom session auth — deployed via Wrangler.**
-
----
-
-## Getting Started
-
-```bash
-# Install dependencies
-cd Anurag313y
-npm install
-
-# Copy env vars for local dev
-cp .dev.vars.example .dev.vars
-# Edit .dev.vars with admin credentials and DEEPGRAM_API_KEY (see Anurag313y/.dev.vars.example)
-
-# Apply local D1 migrations
-npm run db:migrate:local
-
-# Start dev server
-npm run dev
-```
-
-From the repo root:
-
-```bash
-npm run dev
-npm run build
-npm run db:migrate:local
-```
-
----
-
-## JARVIS Voice with Deepgram (STT + TTS)
-
-**Overview:** Replace browser Web Speech with Deepgram STT + TTS (natural voice), proxy API keys through Cloudflare Workers, and serve Jarvis chat from the server using Gemini/Cohere admin config for portfolio-grounded replies.
-
----
-
-### Target Architecture
-
-#### System Overview
+### JARVIS architecture
 
 ```mermaid
 flowchart TB
@@ -452,13 +357,13 @@ flowchart TB
 ```
 
 | Layer | Components | Role |
-|-------|------------|------|
+|---|---|---|
 | **Client** | `Hero.tsx`, `use-jarvis-voice.ts` | Mic capture, live transcript UI, audio playback |
 | **Worker** | `jarvis.functions.ts`, `jarvis.server.ts`, `deepgram.server.ts`, `llm.server.ts` | Proxy secrets, LLM routing, rate limits |
 | **Cloudflare data** | D1, KV | Portfolio content, sessions, cache, per-IP limits |
 | **External** | Deepgram, Gemini/Cohere | Speech ↔ text, natural language answers |
 
-#### Voice Request Flow
+### Voice request flow
 
 ```mermaid
 sequenceDiagram
@@ -492,186 +397,135 @@ sequenceDiagram
 **Why two paths to Deepgram?**
 
 | Concern | Approach |
-|--------|----------|
-| **STT latency** | Live WebSocket from the **browser** using a **temporary JWT** from your Worker ([Deepgram token auth](https://developers.deepgram.com/guides/fundamentals/token-based-authentication)) — never ship the main API key to the client |
-| **TTS** | **Server-proxied** `POST /v1/speak` is simpler and keeps billing/control on the Worker; optional later: client streaming TTS with another short-lived token |
+|---|---|
+| **STT latency** | Live WebSocket from the **browser** using a **temporary JWT** from your Worker — never ship the main API key to the client |
+| **TTS** | **Server-proxied** `POST /v1/speak` keeps billing and control on the Worker |
 
----
+### Hero UI states
 
-### Current State (Hero UI)
+`Anurag313y/src/components/portfolio/Hero.tsx`:
 
-JARVIS in `Anurag313y/src/components/portfolio/Hero.tsx` uses:
+- States: `ready` → `listening` → `processing` → `responding`
+- **STT:** Deepgram live WebSocket via `@deepgram/sdk` + short-lived JWT from Worker
+- **TTS:** Server-proxied Deepgram Aura voice (`synthesizeJarvisSpeech`)
+- **Brain:** Server-side `askJarvis` → Gemini / Cohere / static fallback
+- Suggestion chips call text-only `handleQuery(text)`
 
-- UI states: `ready` → `listening` → `processing` → `responding`
-- **STT**: Deepgram live WebSocket via `@deepgram/sdk` + short-lived JWT from Worker
-- **TTS**: Server-proxied Deepgram Aura voice (`synthesizeJarvisSpeech`)
-- **Brain**: Server-side `askJarvis` → Gemini / Cohere / static fallback
+### APIs & keys
 
-Admin stores **Gemini** and **Cohere** keys + `primaryModel` in D1 (`AdminDashboard.tsx` API panel), stripped from public responses in `toPublicContent()`. Deepgram key stays in Wrangler secrets only.
-
----
-
-### APIs You Need (signup + keys)
-
-#### 1. Deepgram (required)
+#### Deepgram (required for voice)
 
 | Purpose | Endpoint | Auth |
-|--------|----------|------|
-| **Grant temp token** (for browser STT) | `POST https://api.deepgram.com/v1/auth/grant` | `Authorization: Token <DEEPGRAM_API_KEY>` |
-| **Live STT** (browser) | `wss://api.deepgram.com/v1/listen?model=nova-3&...` | `Authorization: Bearer <JWT>` at connect |
-| **TTS** (server) | `POST https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=mp3` | `Authorization: Token <DEEPGRAM_API_KEY>` |
-| **Body (TTS)** | `{ "text": "..." }` | Returns MP3 (or WAV) stream |
+|---|---|---|
+| Grant temp token (browser STT) | `POST https://api.deepgram.com/v1/auth/grant` | `Authorization: Token <DEEPGRAM_API_KEY>` |
+| Live STT (browser) | `wss://api.deepgram.com/v1/listen?model=nova-3&...` | `Authorization: Bearer <JWT>` |
+| TTS (server) | `POST https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=mp3` | `Authorization: Token <DEEPGRAM_API_KEY>` |
 
-**From [Deepgram Console](https://console.deepgram.com/):**
+Get a key from [Deepgram Console](https://console.deepgram.com/). Suggested models: STT `nova-3`, TTS `aura-2-thalia-en`.
 
-- One **API key** with permissions for listen + speak + auth grant
-- Suggested models:
-  - STT: `nova-3` (or `nova-2` per your plan)
-  - TTS: `aura-2-thalia-en` (natural English; swap in admin later if desired)
+#### Conversational brain (recommended)
 
-**Client package:** `@deepgram/sdk` for live microphone → WebSocket (works with access token factory).
+| Provider | When to use |
+|---|---|
+| **Google Gemini** | Admin `primaryModel: gemini` — [Google AI Studio](https://aistudio.google.com/apikey) |
+| **Cohere** | Admin `primaryModel: cohere` |
+| **Static fallback** | `primaryModel: static` or missing keys |
 
-**Billing note:** Deepgram charges per audio minute (STT) and per character (TTS). Rate limiting is enforced on the Worker (see below).
+#### Browser (no keys)
 
-#### 2. Conversational Brain (recommended — already in app)
+- `getUserMedia({ audio: true })` — mic permission
+- `HTMLAudioElement` — play Deepgram MP3 response
 
-Deepgram does **not** answer questions about your portfolio; it only converts speech ↔ text. You still need an LLM:
-
-| Provider | API | When to use |
-|----------|-----|-------------|
-| **Google Gemini** | `POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=...` | Admin `primaryModel: gemini` |
-| **Cohere** | `POST https://api.cohere.com/v2/chat` | Admin `primaryModel: cohere` |
-| **Static fallback** | Server-side regex / keyword logic | `primaryModel: static` or missing keys |
-
-**You need:** at least one of Gemini API key or Cohere API key (editable in admin). Get Gemini from [Google AI Studio](https://aistudio.google.com/apikey).
-
-#### 3. Browser APIs (no keys)
-
-- `navigator.mediaDevices.getUserMedia({ audio: true })` — mic permission
-- `HTMLAudioElement` / `AudioContext` — play Deepgram MP3 response
-
-Optional fallback to static text-only suggestions if mic or Deepgram fails.
-
----
-
-### Secrets & Configuration
-
-#### Production (Cloudflare)
-
-```bash
-cd Anurag313y
-wrangler secret put DEEPGRAM_API_KEY
-# existing:
-wrangler secret put ADMIN_EMAIL
-wrangler secret put ADMIN_PASSWORD
-```
-
-#### Local (`Anurag313y/.dev.vars.example`)
-
-```env
-DEEPGRAM_API_KEY="your-deepgram-key"
-ADMIN_EMAIL="..."
-ADMIN_PASSWORD="..."
-```
-
-#### Admin UI (API panel)
-
-Stored in D1, **never** in public content:
-
-- `deepgramApiKey` (optional override) — **recommended:** use Worker secret only, not D1
-- `deepgramSttModel`, `deepgramTtsModel`, `deepgramTtsVoice` (optional tuning)
-- `jarvisEnabled: boolean` (kill switch)
-
-**Recommendation:** store **only** `DEEPGRAM_API_KEY` in Wrangler secrets (like admin password), not in portfolio JSON — reduces leak surface if admin DB is ever exported.
-
----
-
-### Server Implementation
+### Server implementation
 
 | File | Responsibility |
-|------|----------------|
-| `Anurag313y/src/lib/api/jarvis.functions.ts` | `createServerFn` endpoints |
-| `Anurag313y/src/lib/jarvis.server.ts` | Deepgram token grant, TTS proxy, LLM routing |
-| `Anurag313y/src/lib/deepgram.server.ts` | Thin fetch wrappers for grant + speak |
-| `Anurag313y/src/lib/llm.server.ts` | Gemini + Cohere adapters + system prompt builder |
-| `Anurag313y/src/lib/jarvis-answer.server.ts` | Static fallback answers |
-| `Anurag313y/src/lib/jarvis-actions.ts` | Structured scroll / resume actions |
+|---|---|
+| `src/lib/api/jarvis.functions.ts` | `createServerFn` endpoints |
+| `src/lib/jarvis.server.ts` | Deepgram token grant, TTS proxy, LLM routing |
+| `src/lib/deepgram.server.ts` | Fetch wrappers for grant + speak |
+| `src/lib/llm.server.ts` | Gemini + Cohere adapters + system prompt builder |
+| `src/lib/jarvis-answer.server.ts` | Static fallback answers |
+| `src/lib/jarvis-actions.ts` | Structured scroll / resume actions |
 
-#### Server functions (public, rate-limited)
+**Server functions (public, rate-limited):**
 
 1. **`getDeepgramToken`** — `POST /v1/auth/grant` → `{ accessToken, expiresIn }`
-2. **`askJarvis`** — input: `{ message: string, history?: { role, content }[] }` (cap history ~6 turns)
-   - Load admin content server-side (`fetchAdminContent()`)
-   - Build system prompt from `profile`, `projects`, `skills`, `experience`, `about`
-   - Call Gemini or Cohere per `primaryModel`; fallback to static logic server-side
-   - Return `{ text, actions?: { scrollTo?: string } }` (actions as structured data, not DOM on server)
-3. **`synthesizeJarvisSpeech`** — input: `{ text: string }` → returns `audio/mpeg` bytes or base64 + mime
+2. **`askJarvis`** — `{ message, history? }` → loads portfolio context, calls LLM, returns `{ text, actions? }`
+3. **`synthesizeJarvisSpeech`** — `{ text }` → returns `audio/mpeg` bytes
 
-#### Rate limiting (important)
+**Rate limiting** (Cloudflare KV): max **30** `askJarvis` + **60** TTS requests per IP per hour → `429` when exceeded.
 
-Uses **Cloudflare KV** (`PORTFOLIO_CACHE` or a dedicated `JARVIS_RATE` namespace):
-
-- Max **30** `askJarvis` + **60** TTS requests per IP per hour
-- Returns `429` with a friendly message when exceeded
-
----
-
-### Client Implementation
+### Client implementation
 
 Hook: `Anurag313y/src/hooks/use-jarvis-voice.ts`
 
 | Step | Behavior |
-|------|----------|
-| Start listen | Request mic → `getDeepgramToken()` → open Deepgram live connection → show interim transcript |
-| Stop / finalize | Close WS, send final transcript to `askJarvis` |
-| Respond | Set `responding`, play audio from `synthesizeJarvisSpeech` via `URL.createObjectURL` |
-| Actions | Map server `scrollTo` ids (`projects`, `skills`, etc.) to `scrollIntoView` / `window.open` for resume |
+|---|---|
+| Start listen | Request mic → `getDeepgramToken()` → open Deepgram live connection |
+| Stop / finalize | Close WS, send transcript to `askJarvis` |
+| Respond | Play audio from `synthesizeJarvisSpeech` via `URL.createObjectURL` |
+| Actions | Map `scrollTo` ids to `scrollIntoView` / `window.open` for resume |
 | Errors | Toast + revert to `ready`; re-fetch token if expired |
 
-`Hero.tsx`:
+### System prompt (JARVIS personality)
 
-- Uses `use-jarvis-voice` hook (no Web Speech primary path)
-- `supported` → `micSupported && deepgramConfigured`
-- Suggestion chips still call text-only `handleQuery(text)`
+Short answers for voice (1–3 sentences), first-person as assistant, only portfolio data from context, refuse unrelated requests politely.
 
-### System Prompt (Jarvis Personality)
+### JARVIS setup checklist
 
-Keep answers **short for voice** (1–3 sentences unless user asks for detail), first-person as assistant (“Anurag’s top project is…”), only use portfolio data from context, refuse unrelated requests politely, suggest contact/projects when unsure.
+1. Add `DEEPGRAM_API_KEY` to `.dev.vars`
+2. Run `npm run dev`
+3. Chrome/Edge: grant mic → speak → hear Aura voice reply
+4. Admin: set `primaryModel` to `gemini`, save key, ask open-ended question
+5. Verify public `getPortfolioContent` has **no** API keys
+6. Production: `wrangler secret put DEEPGRAM_API_KEY` then smoke test
 
-### Dependencies
+| Service | What you get | Used for |
+|---|---|---|
+| **Deepgram** | API key | STT, TTS, temp tokens |
+| **Gemini** or **Cohere** | API key | Natural language answers |
+| **Browser** | Mic permission | Audio capture |
 
-```bash
-cd Anurag313y
-npm install @deepgram/sdk
-```
-
-Use SDK on **client** for live STT only; server uses `fetch` for grant + speak to avoid bundling issues on Workers.
-
----
-
-### Phased Delivery
+### Implementation status
 
 | Phase | Deliverable | Status |
-|-------|-------------|--------|
+|---|---|---|
 | **1** | Worker secrets + `getDeepgramToken` + live STT in Hero | Done |
 | **2** | `synthesizeJarvisSpeech` + replace `speechSynthesis` | Done |
 | **3** | `askJarvis` + Gemini/Cohere + structured scroll actions | Done |
 | **4** | KV rate limits + admin kill switch + error/fallback UX | Done |
 
-### Testing Checklist
+---
 
-1. Local: set `DEEPGRAM_API_KEY` in `.dev.vars`, run `npm run dev`
-2. Chrome/Edge: mic permission → speak → see live transcript → hear Aura voice reply
-3. Admin: set `primaryModel` to `gemini`, save key, ask open-ended question (not just keywords)
-4. Verify public `getPortfolioContent` response has **no** Deepgram/Gemini/Cohere keys
-5. Deploy: `wrangler secret put DEEPGRAM_API_KEY` then smoke test production URL
+## Deployment
 
-### Summary: APIs to Obtain
+```bash
+cd Anurag313y
 
-| Service | What you get | Used for |
-|---------|----------------|----------|
-| **Deepgram** | API key | STT (live), TTS (speak), temp tokens |
-| **Google Gemini** *or* **Cohere** | API key (admin UI) | Natural language answers about portfolio |
-| **Browser** | Mic permission | Capture audio — no key |
+# One-time: set production secrets
+wrangler secret put ADMIN_EMAIL
+wrangler secret put ADMIN_PASSWORD
+wrangler secret put DEEPGRAM_API_KEY
 
-No OpenAI/ElevenLabs required for this stack.
+# Apply remote migrations (before first deploy)
+npm run db:migrate:remote
+
+# Build and deploy
+npm run deploy
+```
+
+The Worker is named **`anurag-portfolio`** with observability enabled (see `wrangler.jsonc`).
+
+---
+
+## Development Notes
+
+- **Path alias:** `@/*` maps to `src/*` inside `Anurag313y/`
+- **JARVIS dependency:** `@deepgram/sdk` on client for live STT; server uses `fetch` for grant + speak
+- **Rate limiting:** JARVIS endpoints rate-limited per IP via Cloudflare KV
+
+---
+
+## License
+
+Private project.
