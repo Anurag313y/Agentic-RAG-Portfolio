@@ -10,12 +10,18 @@ This is a **full-stack SSR React app** deployed as a single Cloudflare Worker �
 
 ## Quick Start
 
+Choose **local Node development** for day-to-day coding, or **Docker** for a reproducible, production-like runtime without installing Node on the host.
+
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
-- [npm](https://www.npmjs.com/)
+| Method | Requirements |
+|---|---|
+| **Local (Node)** | [Node.js](https://nodejs.org/) 18+, [npm](https://www.npmjs.com/) |
+| **Docker** | [Docker Engine](https://docs.docker.com/engine/install/) 24+ or [Docker Desktop](https://www.docker.com/products/docker-desktop/), with Docker Compose v2 |
 
-### Run locally
+---
+
+### Option A — Run locally (Node)
 
 ```bash
 # 1. Go to the app folder
@@ -38,6 +44,38 @@ npm run dev
 Open **http://127.0.0.1:5173** in your browser.
 
 > **Tip:** You can also run `npm run dev` from the repo root — it forwards to `Anurag313y/` automatically.
+
+---
+
+### Option B — Run with Docker
+
+From the **repo root**, Docker builds the app, applies local D1 migrations, and serves the Worker via Wrangler on port **8787**.
+
+```bash
+# 1. Create environment file
+cp docker/.env.example docker/.env
+# Windows: copy docker\.env.example docker\.env
+
+# 2. Edit docker/.env — at minimum set ADMIN_EMAIL and ADMIN_PASSWORD
+#    Optional: RESEND_*, DEEPGRAM_API_KEY, GEMINI_API_KEY, COHERE_API_KEY
+
+# 3. Build and start (foreground)
+docker compose up --build
+
+# Or run detached in the background
+docker compose up --build -d
+```
+
+Open **http://127.0.0.1:8787** in your browser.
+
+| Command | Purpose |
+|---|---|
+| `docker compose logs -f` | Stream container logs |
+| `docker compose ps` | Check service and health status |
+| `docker compose down` | Stop and remove containers |
+| `docker compose up --build --force-recreate` | Rebuild after dependency or Dockerfile changes |
+
+> **Note:** The container uses a multi-stage build and runs `wrangler dev` with local D1/KV emulation — ideal for demos, CI, and smoke testing. For image architecture, platform deployment, and raw `docker build` / `docker run` commands, see [Docker Deployment](#docker-deployment).
 
 ---
 
