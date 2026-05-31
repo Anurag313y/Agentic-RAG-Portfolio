@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 
 export function getServerSecrets() {
   const adminEmail = env.ADMIN_EMAIL?.trim();
-  const adminPassword = env.ADMIN_PASSWORD;
+  const adminPassword = env.ADMIN_PASSWORD?.trim();
 
   if (!adminEmail || !adminPassword) {
     throw new Error(
@@ -17,12 +17,23 @@ export function getServerSecrets() {
   };
 }
 
-export function getResendApiKey(): string | null {
-  return env.RESEND_API_KEY?.trim() || null;
+/** Fallback SMTP config from env vars — SMTP_PASS must be configured via env vars/secrets for security. */
+export function getSmtpEnvFallback(): {
+  smtpUser: string | null;
+  smtpPass: string | null;
+  smtpHost: string;
+  smtpPort: number;
+} {
+  return {
+    smtpUser: env.SMTP_USER?.trim() || null,
+    smtpPass: env.SMTP_PASS?.trim() || null,
+    smtpHost: env.SMTP_HOST?.trim() || "smtp.gmail.com",
+    smtpPort: Number(env.SMTP_PORT?.trim()) || 465,
+  };
 }
 
 function readEnvSecret(
-  name: keyof Pick<Env, "DEEPGRAM_API_KEY" | "COHERE_API_KEY" | "GEMINI_API_KEY">,
+  name: keyof Pick<Cloudflare.Env, "DEEPGRAM_API_KEY" | "COHERE_API_KEY" | "GEMINI_API_KEY">,
 ): string | null {
   const key = env[name]?.trim();
   return key || null;

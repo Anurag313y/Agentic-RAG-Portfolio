@@ -1,0 +1,26 @@
+services:
+  web:
+    container_name: portfolio-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8787:8787"
+    env_file:
+      - .dev.vars
+    environment:
+      PORT: "8787"
+      NODE_ENV: production
+    restart: unless-stopped
+    volumes:
+      - wrangler-state:/app/.wrangler/state
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/').then(r=>{if(!r.ok)process.exit(1);return r.text()}).then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 35s
+      retries: 6
+
+volumes:
+  wrangler-state:
+    name: portfolio_wrangler_state

@@ -26,12 +26,32 @@ const CONTENT_ROW_ID = 1;
 export async function ensureAdminUser(): Promise<void> {
   const db = getDb();
   const secrets = getServerSecrets();
-  const existing = await db.select().from(adminUsers).limit(1);
-  if (existing.length > 0) return;
+  const targetEmail = secrets.adminEmail.toLowerCase();
 
+  const existing = await db
+    .select()
+    .from(adminUsers)
+    .where(eq(adminUsers.email, targetEmail))
+    .get();
+
+  if (existing) {
+    // If the env password still matches the stored hash, nothing to do.
+    const matches = await verifyPassword(secrets.adminPassword, existing.passwordHash);
+    if (matches) return;
+
+    // Password in .dev.vars changed — update the stored hash so login works.
+    const newHash = await hashPassword(secrets.adminPassword);
+    await db
+      .update(adminUsers)
+      .set({ passwordHash: newHash })
+      .where(eq(adminUsers.id, existing.id));
+    return;
+  }
+
+  // No admin user with this email yet — create one.
   const passwordHash = await hashPassword(secrets.adminPassword);
   await db.insert(adminUsers).values({
-    email: secrets.adminEmail.toLowerCase(),
+    email: targetEmail,
     passwordHash,
     createdAt: Date.now(),
   });
@@ -199,12 +219,17 @@ export async function requireAdminSession(): Promise<void> {
 export async function saveContactMessage(input: {
   name: string;
   email: string;
+  phone?: string;
   subject: string;
   message: string;
 }): Promise<void> {
   const db = getDb();
   await db.insert(contactMessages).values({
-    ...input,
+    name: input.name,
+    email: input.email,
+    phone: input.phone || null,
+    subject: input.subject,
+    message: input.message,
     createdAt: Date.now(),
   });
 }

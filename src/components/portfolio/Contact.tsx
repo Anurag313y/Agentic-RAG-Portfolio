@@ -16,7 +16,7 @@ export function Contact() {
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
 
   const copy = async () => {
     await navigator.clipboard.writeText(profile.email);
@@ -29,10 +29,11 @@ export function Contact() {
     e.preventDefault();
     const name = sanitize(form.name);
     const email = sanitize(form.email);
+    const phone = sanitize(form.phone);
     const subject = sanitize(form.subject);
     const message = sanitize(form.message);
     if (!name || !email || !subject || !message) {
-      toast.error("Please fill in all fields");
+      toast.error("Please fill in all required fields");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -42,18 +43,18 @@ export function Contact() {
 
     setLoading(true);
     try {
-      await submitContact({ data: { name, email, subject, message } });
+      await submitContact({ data: { name, email, phone, subject, message } });
       setSent(true);
       toast.success("Message sent — I'll get back to you soon.");
-      setForm({ name: "", email: "", subject: "", message: "" });
+      setForm({ name: "", email: "", phone: "", subject: "", message: "" });
       setTimeout(() => setSent(false), 4000);
     } catch (err) {
       const message = err instanceof Error ? err.message : "";
       if (message.includes("Too many contact")) {
         toast.error(message);
-      } else if (message.includes("RESEND_API_KEY") || message.includes("not configured")) {
+      } else if (message.includes("SMTP_PASS") || message.includes("not configured")) {
         toast.error(
-          "Add RESEND_API_KEY to .dev.vars (get one at resend.com/api-keys), then restart npm run dev.",
+          "Admin: Please configure SMTP_PASS in your .dev.vars file (locally) or as a secure secret in Cloudflare (production).",
           { duration: 8000 },
         );
       } else if (message.includes("Admin → Profile")) {
@@ -156,6 +157,17 @@ export function Contact() {
                 />
               </label>
             </div>
+            <label className="block">
+              <div className="text-xs font-mono text-muted-foreground mb-1.5">contact number (optional)</div>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                maxLength={20}
+                className="w-full bg-background/50 border border-border focus:border-cyan/60 focus:ring-2 focus:ring-cyan/20 outline-none rounded-lg px-3 py-2.5 text-sm"
+                placeholder="+91 98765 43210"
+              />
+            </label>
             <label className="block">
               <div className="text-xs font-mono text-muted-foreground mb-1.5">subject</div>
               <input

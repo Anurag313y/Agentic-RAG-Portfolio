@@ -24,6 +24,7 @@ export const contactMessages = sqliteTable("contact_messages", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   email: text("email").notNull(),
+  phone: text("phone"),
   subject: text("subject").notNull(),
   message: text("message").notNull(),
   createdAt: integer("created_at").notNull(),

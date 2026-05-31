@@ -25,7 +25,6 @@ import { toast } from "sonner";
 import { adminLogout } from "@/lib/api/auth.functions";
 import {
   getAdminContent,
-  resetPortfolioContent,
   updatePortfolioContent,
 } from "@/lib/api/portfolio.functions";
 import type { AdminContent } from "@/lib/admin-store";
@@ -134,26 +133,7 @@ export function AdminDashboard({
             >
               view site
             </Link>
-            <button
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await resetPortfolioContent();
-                  await queryClient.invalidateQueries({ queryKey: PORTFOLIO_QUERY_KEY });
-                  const fresh = await getAdminContent();
-                  setContent(fresh);
-                  toast.success("Reset to defaults");
-                } catch {
-                  toast.error("Failed to reset");
-                } finally {
-                  setSaving(false);
-                }
-              }}
-              disabled={saving}
-              className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-border hover:border-cyan/40 font-mono inline-flex items-center gap-1 sm:gap-1.5 disabled:opacity-60"
-            >
-              <RotateCcw className="size-3.5" /> <span className="hidden sm:inline">reset</span>
-            </button>
+
             <button
               onClick={logout}
               className="text-xs px-2 sm:px-3 py-1.5 rounded-md border border-destructive/40 text-destructive hover:bg-destructive/10 font-mono inline-flex items-center gap-1 sm:gap-1.5"
@@ -570,10 +550,7 @@ function ProjectsPanel({
                 value={p.stack.join(", ")}
                 onChange={(v) =>
                   update(i, {
-                    stack: v
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean),
+                    stack: v.split(",").map((s) => s.trim()),
                   })
                 }
               />
@@ -598,10 +575,7 @@ function ProjectsPanel({
                 value={p.features.join(", ")}
                 onChange={(v) =>
                   update(i, {
-                    features: v
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean),
+                    features: v.split(",").map((s) => s.trim()),
                   })
                 }
               />
@@ -622,7 +596,16 @@ function ProjectsPanel({
           <Plus className="size-4" /> Add project
         </button>
         <button
-          onClick={() => onSave({ ...content, projects: items })}
+          onClick={() =>
+            onSave({
+              ...content,
+              projects: items.map((p) => ({
+                ...p,
+                stack: p.stack.filter(Boolean),
+                features: p.features.filter(Boolean),
+              })),
+            })
+          }
           className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
         >
           <Save className="size-4" /> Save changes
@@ -663,10 +646,7 @@ function SkillsPanel({
                 value={s.items.join(", ")}
                 onChange={(v) =>
                   update(i, {
-                    items: v
-                      .split(",")
-                      .map((x) => x.trim())
-                      .filter(Boolean),
+                    items: v.split(",").map((x) => x.trim()),
                   })
                 }
               />
@@ -691,7 +671,15 @@ function SkillsPanel({
           <Plus className="size-4" /> Add category
         </button>
         <button
-          onClick={() => onSave({ ...content, skills: items })}
+          onClick={() =>
+            onSave({
+              ...content,
+              skills: items.map((s) => ({
+                ...s,
+                items: s.items.filter(Boolean),
+              })),
+            })
+          }
           className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-cyan text-primary-foreground font-medium glow-cyan hover:bg-cyan-glow text-sm"
         >
           <Save className="size-4" /> Save changes
@@ -1022,9 +1010,7 @@ function ApiPanel({
       </div>
 
       <div className="mb-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed">
-        Save keys here to enable JARVIS voice and AI replies without redeploying. Environment
-        variables in <span className="font-mono text-cyan">.dev.vars</span> are used only when a
-        field is left empty.
+        Save keys here to enable JARVIS voice and AI replies without redeploying. For security, SMTP settings (like your App Password) must be configured in <span className="font-mono text-cyan">.dev.vars</span> via <span className="font-mono text-cyan">SMTP_PASS</span> (locally) or as a secure secret (in production).
       </div>
 
       <div className="space-y-6">

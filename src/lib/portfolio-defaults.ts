@@ -34,6 +34,7 @@ export function toPublicContent(content: AdminContent): PortfolioContent {
   return publicContent;
 }
 
+
 export function mergeContent(raw: unknown): AdminContent {
   return { ...DEFAULT_ADMIN_CONTENT, ...(raw as Partial<AdminContent>) };
 }

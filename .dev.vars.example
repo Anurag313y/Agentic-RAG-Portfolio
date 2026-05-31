@@ -8,10 +8,12 @@
 ADMIN_EMAIL="your-admin-email@example.com"
 ADMIN_PASSWORD="use-a-strong-password-here"
 
-# Contact form email (Resend) — https://resend.com/api-keys
-# Messages are delivered to the email in Admin → Profile & Contact (not ADMIN_EMAIL).
-# RESEND_API_KEY="re_xxxxxxxx"
-# RESEND_FROM="Portfolio <hello@yourdomain.com>"
+# Contact form email (SMTP)
+# For security, SMTP settings (like your App Password) must be configured here via SMTP_PASS (locally) or as a secure secret in Cloudflare (in production).
+# SMTP_USER="your-email@gmail.com"
+# SMTP_PASS="your-16-char-app-password"
+# SMTP_HOST="smtp.gmail.com"
+# SMTP_PORT="465"
 
 # Optional fallbacks — Admin → API Configuration takes precedence when keys are saved there.
 # DEEPGRAM_API_KEY="your-deepgram-api-key"

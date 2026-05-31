@@ -8,6 +8,7 @@ import { checkContactRateLimit, contactRateLimitMessage } from "../rate-limit.se
 const contactSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().email().max(200),
+  phone: z.string().max(20).optional().default(""),
   subject: z.string().min(1).max(300),
   message: z.string().min(1).max(2000),
 });
@@ -37,6 +38,7 @@ export const submitContact = createServerFn({ method: "POST" })
         to: recipient,
         replyTo: data.email,
         name: data.name,
+        phone: data.phone || undefined,
         subject: data.subject,
         message: data.message,
       });
@@ -47,6 +49,12 @@ export const submitContact = createServerFn({ method: "POST" })
       throw error;
     }
 
-    await saveContactMessage(data);
+    await saveContactMessage({
+      name: data.name,
+      email: data.email,
+      phone: data.phone || undefined,
+      subject: data.subject,
+      message: data.message,
+    });
     return { success: true as const };
   });

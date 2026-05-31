@@ -523,12 +523,101 @@ npm run deploy
 
 The Worker is named **`anurag-portfolio`** with observability enabled (see `wrangler.jsonc`).
 
+## Docker Deployment
+
+This project is a **single Cloudflare Worker SSR app** (TanStack Start). The containerization uses an **optimized multi-stage Dockerfile** and runs the Worker using **`wrangler dev`** with an explicit port so the service is reachable from the container and can be health-checked.
+
+### Architecture & strategy
+- **Multi-stage build** for smaller images and better caching:
+  - `deps` stage: deterministic `npm ci` from `package-lock.json`
+  - `build` stage: compiles the Worker bundle (`npm run build`)
+  - `runtime` stage: lightweight **Alpine-based** Node image
+- **Production-like runtime**: container starts **Wrangler dev** (`wrangler dev`) and binds to `0.0.0.0` so Docker can expose it.
+- **Non-root user**: the runtime image runs as a non-root `app` user.
+- **Health check**: Docker probes `GET http://127.0.0.1:$PORT/` and requires an HTTP 2xx/3xx response.
+
+### Environment variables (.env files)
+Docker Compose loads variables from `docker/.env`.
+
+1. Create your env file:
+```bash
+cp docker/.env.example docker/.env
+```
+
+2. Fill in values:
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+- `RESEND_API_KEY`, `RESEND_FROM`
+- `DEEPGRAM_API_KEY`
+- Optional: `GEMINI_API_KEY`, `COHERE_API_KEY`
+
+> Secrets are kept in local env files and not committed.
+
+### Local build + run (Docker)
+From the repo root:
+
+#### Build
+```bash
+docker build -t anurag-portfolio:local .
+```
+
+#### Run
+```bash
+docker run --rm -p 8787:8787 --env-file ./docker/.env anurag-portfolio:local
+```
+
+#### Stop
+```bash
+docker ps
+docker stop <container_id>
+```
+
+#### Rebuild
+```bash
+docker build --no-cache -t anurag-portfolio:local .
+```
+
+#### View logs
+```bash
+docker logs -f <container_id>
+```
+
+### Docker Compose
+```bash
+# Build + start
+docker compose up --build
+
+# Stop
+docker compose down
+
+# Rebuild
+docker compose up --build --force-recreate
+
+# Logs
+docker compose logs -f
+```
+
+### Deploy on Docker-compatible platforms (Render / AWS / DO / DigitalOcean)
+This image runs `wrangler dev` for local container testing (HTTP-exposed on **8787**). For Docker-compatible production deployments, push the image to your registry and set environment variables via the platform UI using the same keys as `docker/.env`.
+
+Suggested container port:
+- `8787`
+
+1. Push image:
+- Docker Hub: `docker tag anurag-portfolio:local <your-dockerhub-user>/anurag-portfolio:<tag>` then `docker push ...`
+- GHCR / ECR: follow your provider’s standard flow
+
+2. Configure the platform service:
+- Container image: your pushed image
+- Port: `8787`
+- Environment variables: load from your configured secrets (same names as `docker/.env`)
+
+> Note: Cloudflare Workers deployment to the edge should still use `wrangler deploy` as documented in the existing README “Deployment” section.
+
 ---
+
 
 ## Development Notes
 
 - **Path alias:** `@/*` maps to `src/*` inside `Anurag313y/`
 - **JARVIS dependency:** `@deepgram/sdk` on client for live STT; server uses `fetch` for grant + speak
 - **Rate limiting:** JARVIS endpoints rate-limited per IP via Cloudflare KV
-
--
