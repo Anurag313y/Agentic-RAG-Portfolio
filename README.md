@@ -2,8 +2,6 @@
 
 A full-stack personal portfolio with an admin dashboard, contact form, and JARVIS voice assistant. Built with **TanStack Start + React 19**, styled with **Tailwind v4 and shadcn/ui**, backed by **Cloudflare Workers, D1, and KV**, with **Drizzle ORM** and custom session auth — deployed via Wrangler.
 
-The main application lives in **`Anurag313y/`**. The repo root forwards scripts to that folder.
-
 This is a **full-stack SSR React app** deployed as a single Cloudflare Worker — not a separate frontend + backend.
 
 ---
