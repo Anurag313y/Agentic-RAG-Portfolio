@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
+ARG WRANGLER_VERSION=4.95.0
+
 # ============================================================
 # Stage 1: Build
 # Uses Alpine for a lightweight build environment.
@@ -27,14 +29,15 @@ RUN npm run build
 # workerd runtime. Using Alpine here would cause ENOENT errors.
 # ============================================================
 FROM node:22-slim AS runtime
+ARG WRANGLER_VERSION
 WORKDIR /app
 
 # dos2unix is critical for Windows users to prevent \r carriage return 
 # bad interpreter errors when running entrypoint.sh
 RUN apt-get update && apt-get install -y dos2unix ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Install wrangler globally. This contains the miniflare/workerd binary.
-RUN npm install -g wrangler@4.95.0
+# Install wrangler globally (workerd/miniflare). Version matches package.json.
+RUN npm install -g wrangler@${WRANGLER_VERSION}
 
 # Security: Create a non-root user with a home directory
 # The -m flag creates /home/app which is required for Wrangler to store .config logs
