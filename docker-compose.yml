@@ -1,16 +1,24 @@
+name: agentic-rag-portfolio
+
 services:
   web:
     container_name: portfolio-web
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        WRANGLER_VERSION: "4.95.0"
+    # Bind to 127.0.0.1 — fixes Docker Desktop on Windows when browsers cannot
+    # reach 0.0.0.0-published ports. Port 5173 maps to the same app (Vite default).
     ports:
-      - "8787:8787"
+      - "127.0.0.1:8787:8787"
+      - "127.0.0.1:5173:8787"
     env_file:
       - .dev.vars
     environment:
       PORT: "8787"
-      NODE_ENV: production
+      NODE_ENV: development
+      CI: "true"
     restart: unless-stopped
     volumes:
       - wrangler-state:/app/.wrangler/state

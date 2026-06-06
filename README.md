@@ -2,8 +2,6 @@
 
 A full-stack personal portfolio with an admin dashboard, contact form, and JARVIS voice assistant. Built with **TanStack Start + React 19**, styled with **Tailwind v4 and shadcn/ui**, backed by **Cloudflare Workers, D1, and KV**, with **Drizzle ORM** and custom session auth — deployed via Wrangler.
 
-The main application lives in **`Anurag313y/`**. The repo root forwards scripts to that folder.
-
 This is a **full-stack SSR React app** deployed as a single Cloudflare Worker — not a separate frontend + backend.
 
 ---
@@ -47,35 +45,34 @@ Open **http://127.0.0.1:5173** in your browser.
 
 ---
 
-### Option B — Run with Docker
+### Option B — Run with Docker (recommended on Windows)
 
-From the **repo root**, Docker builds the app, applies local D1 migrations, and serves the Worker via Wrangler on port **8787**.
+From the **repo root**, Docker builds the app, applies local D1 migrations, and serves the Worker via Wrangler.
 
 ```bash
-# 1. Create environment file
-cp docker/.env.example docker/.env
-# Windows: copy docker\.env.example docker\.env
+# 1. Create secrets file (if you don't have one yet)
+copy .dev.vars.example .dev.vars
+# macOS/Linux: cp .dev.vars.example .dev.vars
 
-# 2. Edit docker/.env — at minimum set ADMIN_EMAIL and ADMIN_PASSWORD
+# 2. Edit .dev.vars — at minimum set ADMIN_EMAIL and ADMIN_PASSWORD
 #    Optional: RESEND_*, DEEPGRAM_API_KEY, GEMINI_API_KEY, COHERE_API_KEY
 
-# 3. Build and start (foreground)
-docker compose up --build
-
-# Or run detached in the background
-docker compose up --build -d
+# 3. Build and start
+npm run docker:up
+# Or: docker compose up --build -d
 ```
 
-Open **http://127.0.0.1:8787** in your browser.
+Open **http://127.0.0.1:8787** or **http://127.0.0.1:5173** in your browser (use `http://`, not `https://`).
 
 | Command | Purpose |
 |---|---|
-| `docker compose logs -f` | Stream container logs |
+| `npm run docker:up` | Build and start in the background |
+| `npm run docker:logs` | Stream container logs |
+| `npm run docker:down` | Stop and remove containers |
+| `npm run docker:restart` | Rebuild and recreate after Dockerfile changes |
 | `docker compose ps` | Check service and health status |
-| `docker compose down` | Stop and remove containers |
-| `docker compose up --build --force-recreate` | Rebuild after dependency or Dockerfile changes |
 
-> **Note:** The container uses a multi-stage build and runs `wrangler dev` with local D1/KV emulation — ideal for demos, CI, and smoke testing. For image architecture, platform deployment, and raw `docker build` / `docker run` commands, see [Docker Deployment](#docker-deployment).
+> **Windows:** Ports are bound to `127.0.0.1` so browsers can reach the app through Docker Desktop. The container runs `wrangler dev` with local D1/KV emulation — ideal when native `npm run dev` fails on Windows. See [Docker Deployment](#docker-deployment).
 
 ---
 
@@ -567,26 +564,28 @@ This project is a **single Cloudflare Worker SSR app** (TanStack Start). The con
 
 ### Architecture & strategy
 - **Multi-stage build** for smaller images and better caching:
-  - `deps` stage: deterministic `npm ci` from `package-lock.json`
-  - `build` stage: compiles the Worker bundle (`npm run build`)
-  - `runtime` stage: lightweight **Alpine-based** Node image
-- **Production-like runtime**: container starts **Wrangler dev** (`wrangler dev`) and binds to `0.0.0.0` so Docker can expose it.
+  - `build` stage: **Node 22 Alpine** — `npm ci` + `npm run build`
+  - `runtime` stage: **Node 22 Debian slim** (glibc required by workerd)
+- **Production-like runtime**: container starts **Wrangler dev** (`wrangler dev`) on `0.0.0.0:8787` inside the container.
+- **Host ports**: `127.0.0.1:8787` and `127.0.0.1:5173` → container `8787` (Windows-friendly).
 - **Non-root user**: the runtime image runs as a non-root `app` user.
-- **Health check**: Docker probes `GET http://127.0.0.1:$PORT/` and requires an HTTP 2xx/3xx response.
+- **Health check**: Docker probes `GET http://127.0.0.1:8787/` and requires an HTTP 2xx/3xx response.
 
-### Environment variables (.env files)
-Docker Compose loads variables from `docker/.env`.
+### Environment variables
+Docker Compose loads secrets from **`.dev.vars`** at the repo root (same file as local Wrangler dev).
 
-1. Create your env file:
+1. Create your secrets file:
 ```bash
-cp docker/.env.example docker/.env
+copy .dev.vars.example .dev.vars
 ```
 
 2. Fill in values:
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD`
-- `RESEND_API_KEY`, `RESEND_FROM`
-- `DEEPGRAM_API_KEY`
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` (required)
+- `RESEND_API_KEY`, `RESEND_FROM` (contact form)
+- `DEEPGRAM_API_KEY` (JARVIS voice)
 - Optional: `GEMINI_API_KEY`, `COHERE_API_KEY`
+
+For `docker run` without Compose, use `docker/.env.example` → `docker/.env` with `--env-file docker/.env`.
 
 > Secrets are kept in local env files and not committed.
 
@@ -600,7 +599,7 @@ docker build -t anurag-portfolio:local .
 
 #### Run
 ```bash
-docker run --rm -p 8787:8787 --env-file ./docker/.env anurag-portfolio:local
+docker run --rm -p 127.0.0.1:8787:8787 -p 127.0.0.1:5173:8787 --env-file ./.dev.vars anurag-portfolio:local
 ```
 
 #### Stop
@@ -635,7 +634,7 @@ docker compose logs -f
 ```
 
 ### Deploy on Docker-compatible platforms (Render / AWS / DO / DigitalOcean)
-This image runs `wrangler dev` for local container testing (HTTP-exposed on **8787**). For Docker-compatible production deployments, push the image to your registry and set environment variables via the platform UI using the same keys as `docker/.env`.
+This image runs `wrangler dev` for local container testing (HTTP on **8787** / **5173** on the host). For Docker-compatible production deployments, push the image to your registry and set environment variables via the platform UI using the same keys as `.dev.vars`.
 
 Suggested container port:
 - `8787`
@@ -647,7 +646,7 @@ Suggested container port:
 2. Configure the platform service:
 - Container image: your pushed image
 - Port: `8787`
-- Environment variables: load from your configured secrets (same names as `docker/.env`)
+- Environment variables: load from your configured secrets (same names as `.dev.vars`)
 
 > Note: Cloudflare Workers deployment to the edge should still use `wrangler deploy` as documented in the existing README “Deployment” section.
 

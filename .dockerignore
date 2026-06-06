@@ -14,4 +14,4 @@ pnpm-debug.log*
 .env.*
 .dev.vars
 .dev.vars.*
-!docker/.env
+!docker/.env.example
