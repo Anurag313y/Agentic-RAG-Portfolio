@@ -11,7 +11,7 @@ import {
   verifyPassword,
 } from "./auth.server";
 import { invalidateContentCache, readContentCache, writeContentCache, writeAdminSecretsKv, setSecretsMemory, ensureAdminSecretsKv } from "./cache.server";
-import { secretsFromContent } from "./secrets.server";
+import { secretsFromContent, resolveCohereApiKey } from "./secrets.server";
 import type { AdminContent, PortfolioContent } from "./content.types";
 import { getDb } from "./db.server";
 import {
@@ -19,9 +19,23 @@ import {
   mergeContent,
   toPublicContent,
 } from "./portfolio-defaults";
+import { waitUntil } from "cloudflare:workers";
+
 import { getServerSecrets } from "./config.server";
+import { indexContent, markRagUnconfigured } from "./rag.server";
+import { readRagIndexStatus } from "./cache.server";
+import type { RagIndexStatus } from "./content.types";
+
+export type { RagIndexStatus };
 
 const CONTENT_ROW_ID = 1;
+const ADMIN_CONTENT_CACHE_TTL_MS = 2 * 60 * 1000;
+
+let adminContentMemory: { content: AdminContent; expiresAt: number } | null = null;
+
+function invalidateAdminContentCache(): void {
+  adminContentMemory = null;
+}
 
 export async function ensureAdminUser(): Promise<void> {
   const db = getDb();
@@ -97,7 +111,6 @@ function preserveAdminSecrets(incoming: AdminContent, existing: AdminContent | n
     ...incoming,
     deepgramApiKey: incoming.deepgramApiKey?.trim() || existing.deepgramApiKey || "",
     cohereApiKey: incoming.cohereApiKey?.trim() || existing.cohereApiKey || "",
-    geminiApiKey: incoming.geminiApiKey?.trim() || existing.geminiApiKey || "",
   };
 }
 
@@ -118,10 +131,18 @@ export async function fetchPublicContent(): Promise<PortfolioContent> {
 }
 
 export async function fetchAdminContent(): Promise<AdminContent> {
+  if (adminContentMemory && adminContentMemory.expiresAt > Date.now()) {
+    return adminContentMemory.content;
+  }
+
   await ensureContentSeeded();
   const fromDb = await readContentFromDb();
   const content = fromDb ?? DEFAULT_ADMIN_CONTENT;
   await bootstrapSecretsKv(content);
+  adminContentMemory = {
+    content,
+    expiresAt: Date.now() + ADMIN_CONTENT_CACHE_TTL_MS,
+  };
   return content;
 }
 
@@ -155,13 +176,60 @@ export async function saveAdminContent(content: AdminContent): Promise<Portfolio
   }
 
   const publicContent = toPublicContent(payloadContent);
+  invalidateAdminContentCache();
   await invalidateContentCache();
   await writeContentCache(publicContent);
+
+  // Eager RAG indexing — keep worker alive until embed finishes.
+  waitUntil(
+    resolveCohereApiKey(payloadContent)
+      .then(async (key) => {
+        if (key) {
+          await indexContent(payloadContent, key, { force: false });
+          return;
+        }
+        await markRagUnconfigured();
+      })
+      .catch((err) => console.error("[rag] Background indexing failed:", err)),
+  );
+
   return publicContent;
 }
 
 export async function resetToDefaults(): Promise<PortfolioContent> {
   return saveAdminContent(DEFAULT_ADMIN_CONTENT);
+}
+
+/**
+ * Kick off RAG re-index in the background so status polls can run concurrently.
+ * Returns immediately with current indexing status.
+ */
+export async function triggerReindexRagBackground(): Promise<RagIndexStatus> {
+  const content = await fetchAdminContent();
+  const cohereKey = await resolveCohereApiKey(content);
+  if (!cohereKey) {
+    await markRagUnconfigured();
+    return fetchRagIndexStatus();
+  }
+
+  const current = await fetchRagIndexStatus();
+  if (current.state === "indexing") {
+    return current;
+  }
+
+  waitUntil(
+    indexContent(content, cohereKey, { force: true }).catch((err) => {
+      console.error("[rag] Background reindex failed:", err);
+    }),
+  );
+
+  // Allow indexContent to write initial KV status before the client polls.
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  return fetchRagIndexStatus();
+}
+
+export async function fetchRagIndexStatus(): Promise<RagIndexStatus> {
+  return readRagIndexStatus();
 }
 
 export async function authenticateAdmin(email: string, password: string): Promise<boolean> {

@@ -154,7 +154,7 @@ export async function transcribeAudio(
       Authorization: `Token ${key}`,
       "Content-Type": contentType,
     },
-    body: base64ToBytes(audioBase64),
+    body: base64ToBytes(audioBase64).buffer as ArrayBuffer,
   });
 
   if (!res.ok) {

@@ -3,14 +3,32 @@ export type JarvisFocus =
   | "projects"
   | "skills"
   | "experience"
+  | "education"
   | "contact"
   | "resume"
   | "about"
   | "terminal"
   | "general";
 
+/** Personal / FAQ questions that should prioritize Knowledge Base chunks in RAG. */
+export function isKnowledgeBaseQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  return /\b(education|school|college|university|degree|secondary|higher secondary|higher-secondary|12th|10th|intermediate|graduate|postgraduate|mba|b\.?tech|m\.?tech|studied|study|certification|certified|hobby|hobbies|language|fluent|born|childhood|hometown|native|open to work|availability|relocate|salary|expected|interview|fun fact|matriculation|ssc|hsc|cbse|icse|where did|where has|where was)\b/.test(
+    q,
+  );
+}
+
 export function detectJarvisFocus(question: string): JarvisFocus {
   const q = question.toLowerCase();
+
+  // Education / schooling — before experience (some users say "education history")
+  if (
+    /\b(education|school|college|university|secondary|higher secondary|higher-secondary|12th|10th|intermediate|matriculation|ssc|hsc|where did.*(study|school)|completed.*(school|education))\b/.test(
+      q,
+    )
+  ) {
+    return "education";
+  }
 
   // Specific topics first (avoid "tell me" matching generic about)
   if (/\b(project|projects|portfolio|built|builds?|github repo|repos)\b/.test(q)) {
@@ -64,6 +82,8 @@ export function focusRoutingInstruction(
       return `The user is asking about SKILLS. List concrete technologies from the Skills section.`;
     case "experience":
       return `The user is asking about WORK EXPERIENCE or TOTAL YEARS OF EXPERIENCE. Use DERIVED FACTS for any year-count question — state the exact total years given there, never guess. For role questions, mention role, company, and duration from Experience.`;
+    case "education":
+      return `The user is asking about EDUCATION or schooling. Answer ONLY from knowledge_base entries in RETRIEVED CONTEXT — state school/college names, levels (10th, 12th, degree), and locations exactly as written. Do NOT say you lack information if a knowledge_base entry answers this.`;
     case "contact":
       return `The user wants CONTACT info. Give the email from the data below.`;
     case "resume":
@@ -73,6 +93,6 @@ export function focusRoutingInstruction(
     case "terminal":
       return `The user asked about the terminal/console. Explain they can switch to terminal mode in the hero section.`;
     default:
-      return `Answer the user's question using the facts below. If they ask about projects, skills, or experience, use those sections — not a generic bio.`;
+      return `Answer the user's question using RETRIEVED CONTEXT below. For personal facts (education, certifications, hobbies, background, FAQs), use knowledge_base entries first. Do NOT say you lack information when the fact appears in RETRIEVED CONTEXT.`;
   }
 }

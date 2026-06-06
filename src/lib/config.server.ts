@@ -33,7 +33,7 @@ export function getSmtpEnvFallback(): {
 }
 
 function readEnvSecret(
-  name: keyof Pick<Cloudflare.Env, "DEEPGRAM_API_KEY" | "COHERE_API_KEY" | "GEMINI_API_KEY">,
+  name: keyof Pick<Cloudflare.Env, "DEEPGRAM_API_KEY" | "COHERE_API_KEY">,
 ): string | null {
   const key = env[name]?.trim();
   return key || null;
@@ -45,10 +45,6 @@ export function getDeepgramApiKey(): string | null {
 
 export function getCohereApiKey(): string | null {
   return readEnvSecret("COHERE_API_KEY");
-}
-
-export function getGeminiApiKey(): string | null {
-  return readEnvSecret("GEMINI_API_KEY");
 }
 
 export function isDeepgramConfigured(): boolean {

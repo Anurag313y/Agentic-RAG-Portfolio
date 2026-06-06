@@ -20,7 +20,7 @@ rm -f /app/.dev.vars
 for var in \
   ADMIN_EMAIL ADMIN_PASSWORD \
   SMTP_USER SMTP_PASS SMTP_HOST SMTP_PORT \
-  DEEPGRAM_API_KEY COHERE_API_KEY GEMINI_API_KEY \
+  DEEPGRAM_API_KEY COHERE_API_KEY \
   RESEND_API_KEY RESEND_FROM; do
   val=$(eval "printf '%s' \"\${${var}:-}\"")
   if [ -n "$val" ]; then

@@ -18,4 +18,3 @@ ADMIN_PASSWORD="use-a-strong-password-here"
 # Optional fallbacks — Admin → API Configuration takes precedence when keys are saved there.
 # DEEPGRAM_API_KEY="your-deepgram-api-key"
 # COHERE_API_KEY="your-cohere-api-key"
-# GEMINI_API_KEY="your-gemini-api-key"

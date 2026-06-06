@@ -113,7 +113,7 @@ export function useJarvisVoice(resumeUrl: string) {
   const playOneSegment = useCallback((base64: string, mimeType: string) => {
     return new Promise<void>((resolve, reject) => {
       const bytes = base64ToUint8Array(base64);
-      const blob = new Blob([bytes], { type: mimeType });
+      const blob = new Blob([bytes as any], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.preload = "auto";
@@ -140,16 +140,23 @@ export function useJarvisVoice(resumeUrl: string) {
   }, []);
 
   const playSpeech = useCallback(
-    async (text: string) => {
-      if (!voiceOn) {
-        setState("ready");
-        return;
-      }
-      const parts = splitTextForTts(textForJarvisSpeech(text));
+    async (fullText: string) => {
+      const parts = splitTextForTts(fullText);
       if (parts.length === 0) {
+        setResponse("");
         setState("ready");
         return;
       }
+
+      if (!voiceOn) {
+        setResponse(fullText);
+        setTimeout(() => setState("ready"), 1800);
+        return;
+      }
+
+      setState("responding");
+      setResponse(""); // clear previous response
+
       try {
         if (audioRef.current) {
           audioRef.current.pause();
@@ -159,13 +166,37 @@ export function useJarvisVoice(resumeUrl: string) {
           audioRef.current = null;
         }
 
-        for (const part of parts) {
-          const { base64, mimeType } = await synthesizeJarvisSpeech({ data: { text: part } });
-          await playOneSegment(base64, mimeType);
+        // 1. Kick off all TTS synthesis calls in parallel to reduce API latency completely
+        const synthesisPromises = parts.map(async (part) => {
+          const ttsText = textForJarvisSpeech(part);
+          if (!ttsText) return null;
+          try {
+            const result = await synthesizeJarvisSpeech({ data: { text: ttsText } });
+            return { part, result };
+          } catch (e) {
+            console.error(`[jarvis] Failed synthesizing part: "${part}"`, e);
+            return { part, result: null };
+          }
+        });
+
+        // 2. Play sequentially while revealing the corresponding text block
+        for (let i = 0; i < parts.length; i++) {
+          const synth = await synthesisPromises[i];
+          const partText = synth ? synth.part : parts[i];
+          
+          // Append this sentence to the visible response right before we play its audio
+          setResponse((prev) => (prev ? prev + " " + partText : partText));
+
+          if (synth && synth.result) {
+            const { base64, mimeType } = synth.result;
+            await playOneSegment(base64, mimeType);
+          }
         }
         setState("ready");
       } catch (error) {
         console.error("[jarvis] TTS failed:", error);
+        // Fallback: show the entire text
+        setResponse(fullText);
         toast.error(error instanceof Error ? error.message : "Voice playback failed");
         setState("ready");
       }
@@ -197,13 +228,11 @@ export function useJarvisVoice(resumeUrl: string) {
           { role: "user", content: trimmed },
           { role: "assistant", content: displayText },
         ];
-        setResponse(displayText);
-        setState("responding");
+        
+        // Remove direct setResponse(displayText) here. Instead, let playSpeech
+        // stream/append it in sync with audio or set it directly if voiceOn is off.
         applyJarvisActions(reply.actions, resumeUrl);
         await playSpeech(displayText);
-        if (!voiceOn) {
-          setTimeout(() => setState("ready"), 1800);
-        }
       } catch (error) {
         console.error("[jarvis] ask failed:", error);
         toast.error(error instanceof Error ? error.message : "JARVIS could not respond");
@@ -212,7 +241,7 @@ export function useJarvisVoice(resumeUrl: string) {
         processingRef.current = false;
       }
     },
-    [playSpeech, resumeUrl, voiceOn],
+    [playSpeech, resumeUrl],
   );
 
   const transcribeRecording = useCallback(async () => {
@@ -283,6 +312,7 @@ export function useJarvisVoice(resumeUrl: string) {
     recorder.onstop = () => {
       void (async () => {
         try {
+          setTranscript("Transcribing audio..."); // Immediate UI feedback that speaking finished
           const text = await transcribeRecording();
           setTranscript(text);
           cleanupListen();

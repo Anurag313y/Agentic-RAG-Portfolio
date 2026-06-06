@@ -9,9 +9,65 @@ export function stripActionMarkers(text: string): string {
     .trim();
 }
 
+/** Pull the fact from RAG-style "Question? Answer: …" knowledge-base lines. */
+export function extractKbFactText(raw: string): string {
+  const t = raw.trim();
+  const inlineQa = t.match(/^[\s\S]+?\?\s*Answer:\s*([\s\S]+)$/i);
+  if (inlineQa?.[1]) return inlineQa[1].trim();
+  const answerOnly = t.match(/^Answer:\s*([\s\S]+)$/i);
+  if (answerOnly?.[1]) return answerOnly[1].trim();
+  return t;
+}
+
+/** Drop a trailing repeated WH-question + "Answer:" echo from the model. */
+export function stripRepeatedQaEcho(text: string): string {
+  const qaStart = text.search(
+    /\s+(?=(?:where|what|when|how|who|which)\b[\s\S]{8,}?\?\s*Answer:\s*)/i,
+  );
+  if (qaStart > 24) {
+    return text.slice(0, qaStart).trim();
+  }
+  return text
+    .replace(
+      /\s+(?:where|what|when|how|who|which)\b[^.?!]*\?\s*Answer:\s*[^.?!]+[.?!]?\s*$/gi,
+      "",
+    )
+    .trim();
+}
+
+/** Remove duplicate sentences (model sometimes restates the same fact). */
+export function dedupeSentences(text: string): string {
+  const parts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const part of parts) {
+    const sentence = part.trim();
+    if (!sentence) continue;
+    const key = sentence.toLowerCase().replace(/\s+/g, " ");
+    if (seen.has(key)) continue;
+
+    let redundant = false;
+    for (const prev of seen) {
+      if (key.includes(prev) || prev.includes(key)) {
+        redundant = true;
+        break;
+      }
+    }
+    if (redundant) continue;
+
+    seen.add(key);
+    out.push(sentence);
+  }
+
+  return out.join(" ").trim();
+}
+
 /** Remove meta commentary (sources, scrolling, knowledge base) from user-facing replies. */
 export function sanitizeJarvisUserFacingText(text: string): string {
   let t = stripActionMarkers(text);
+  t = stripRepeatedQaEcho(t);
+  t = dedupeSentences(t);
 
   const patterns: RegExp[] = [
     /\s*,?\s*(?:based on|according to)\s+(?:the\s+)?(?:knowledge\s*base|portfolio(?:\s+data)?|(?:derived\s+)?facts|(?:this\s+)?site|work\s+history\s+on\s+this\s+site)[^.]*\.?/gi,

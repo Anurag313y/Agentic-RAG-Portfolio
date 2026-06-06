@@ -9,7 +9,6 @@ declare global {
       ADMIN_PASSWORD?: string;
       DEEPGRAM_API_KEY?: string;
       COHERE_API_KEY?: string;
-      GEMINI_API_KEY?: string;
       /** SMTP username (email) — fallback if profile email is not set */
       SMTP_USER?: string;
       /** SMTP app password — configured via .dev.vars or secure environment secrets */

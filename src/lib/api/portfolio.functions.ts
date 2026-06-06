@@ -9,6 +9,8 @@ import {
   requireAdminSession,
   resetToDefaults,
   saveAdminContent,
+  triggerReindexRagBackground,
+  fetchRagIndexStatus,
 } from "../content.server";
 
 const adminContentSchema = z.object({
@@ -18,10 +20,9 @@ const adminContentSchema = z.object({
   experience: z.array(z.record(z.unknown())),
   about: z.string(),
   resumeUrl: z.string(),
-  geminiApiKey: z.string().optional(),
   cohereApiKey: z.string().optional(),
   deepgramApiKey: z.string().optional(),
-  primaryModel: z.enum(["gemini", "cohere", "static"]).optional(),
+  primaryModel: z.enum(["cohere", "static"]).optional(),
   jarvisEnabled: z.boolean().optional(),
   deepgramSttModel: z.string().optional(),
   deepgramTtsModel: z.string().optional(),
@@ -56,4 +57,24 @@ export const updatePortfolioContent = createServerFn({ method: "POST" })
 export const resetPortfolioContent = createServerFn({ method: "POST" }).handler(async () => {
   await requireAdminSession();
   return resetToDefaults();
+});
+
+/** Admin-only: start RAG re-index in background; client polls getRagIndexStatus. */
+export const reindexRag = createServerFn({ method: "POST" }).handler(async () => {
+  await requireAdminSession();
+  const status = await triggerReindexRagBackground();
+  if (status.state === "unconfigured") {
+    return { started: false, chunksIndexed: 0, status };
+  }
+  return {
+    started: status.state === "indexing",
+    chunksIndexed: status.chunkCount,
+    status,
+  };
+});
+
+/** Admin-only: current RAG index status (for dashboard badge). */
+export const getRagIndexStatus = createServerFn({ method: "GET" }).handler(async () => {
+  await requireAdminSession();
+  return fetchRagIndexStatus();
 });
