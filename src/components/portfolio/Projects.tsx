@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { ExternalLink, Github, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { resolveMediaUrl } from "@/lib/media";
@@ -71,7 +72,7 @@ function ProjectCardImage({
   );
 }
 
-function ProjectCard({
+export function ProjectCard({
   project,
   index,
   onOpenDetail,
@@ -205,6 +206,7 @@ function ProjectCard({
 export function Projects() {
   const { profile, projects } = usePortfolio();
   const visibleProjects = projects.filter((p) => !p.hidden);
+  const displayedProjects = visibleProjects.slice(0, 4);
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
 
   const detailProject = detailIndex !== null ? visibleProjects[detailIndex] ?? null : null;
@@ -219,7 +221,7 @@ export function Projects() {
           description="A snapshot of systems I've designed and shipped. Every one of these was built to be maintained."
         />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 lg:gap-6">
-          {visibleProjects.map((p, i) => (
+          {displayedProjects.map((p, i) => (
             <ProjectCard
               key={p.title}
               project={p}
@@ -238,22 +240,25 @@ export function Projects() {
           }}
         />
 
-        <div className="mt-6 sm:mt-10 lg:mt-12 flex justify-center">
-          <motion.a
-            href={profile.socials.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            initial={{ opacity: 0, y: 10 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="inline-flex flex-col sm:flex-row flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-2.5 max-w-full rounded-lg border border-cyan/40 hover:border-cyan text-cyan hover:bg-cyan/5 transition-all duration-300 font-mono text-[11px] sm:text-sm group glow-cyan text-center"
-          >
-            <span className="break-all sm:break-normal">$ cat /portfolio/projects/archive.db</span>
-            <span className="text-muted-foreground group-hover:text-cyan/85 transition-colors">
-              (Show all 30+ repositories)
-            </span>
-            <ExternalLink className="size-3.5 sm:size-4 group-hover:translate-x-0.5 transition-transform shrink-0" />
-          </motion.a>
+        <div className="mt-8 sm:mt-12 flex justify-center">
+          {visibleProjects.length > 4 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <Link
+                to="/projects"
+                className="inline-flex flex-col sm:flex-row flex-wrap items-center justify-center gap-1.5 sm:gap-2 px-5 py-3 rounded-lg border border-cyan/40 hover:border-cyan text-cyan hover:bg-cyan/5 transition-all duration-300 font-mono text-[11px] sm:text-sm group glow-cyan text-center cursor-pointer"
+              >
+                <span>$ ls /portfolio/projects/archive/</span>
+                <span className="text-muted-foreground group-hover:text-cyan/85 transition-colors">
+                  (Show all {visibleProjects.length} projects)
+                </span>
+                <span aria-hidden className="group-hover:translate-x-1 transition-transform">→</span>
+              </Link>
+            </motion.div>
+          )}
         </div>
       </div>
     </section>

@@ -53,27 +53,27 @@ function PhotoCard({ photoSrc, profile }: { photoSrc: string; profile: ReturnTyp
       <div className="absolute bottom-2 left-2 size-2.5 border-b border-l border-cyan/60 z-20" />
       <div className="absolute bottom-2 right-2 size-2.5 border-b border-r border-cyan/60 z-20" />
 
-      <div className="relative z-[1] flex flex-row items-center gap-3 sm:gap-4 lg:flex-col lg:items-stretch">
-        <div className="relative shrink-0 size-[72px] sm:size-20 lg:size-auto lg:w-full rounded-xl overflow-hidden bg-background/40 border border-border/40 lg:aspect-square">
+      <div className="relative z-[1] flex flex-row items-center gap-3 sm:gap-4 md:flex-col md:items-stretch">
+        <div className="relative shrink-0 size-[72px] sm:size-20 md:size-auto md:w-full rounded-xl overflow-hidden bg-background/40 border border-border/40 md:aspect-square">
           <img
             src={photoSrc}
             alt={profile.name}
             width={200}
             height={200}
-            className="w-full h-full object-cover object-top grayscale contrast-125 brightness-95 group-hover:grayscale-0 lg:group-hover:scale-105 transition-all duration-700"
+            className="w-full h-full object-cover object-top grayscale contrast-125 brightness-95 group-hover:grayscale-0 md:group-hover:scale-105 transition-all duration-700"
             onError={(e) => {
               e.currentTarget.src = PHOTO_FALLBACK;
             }}
           />
         </div>
-        <div className="flex-1 min-w-0 lg:hidden">
+        <div className="flex-1 min-w-0 md:hidden">
           <p className="font-semibold text-sm leading-tight truncate">{profile.name}</p>
           <p className="text-xs text-cyan mt-0.5 truncate">{profile.role}</p>
           <p className="font-mono text-[10px] text-muted-foreground mt-1 truncate">{profile.location}</p>
         </div>
       </div>
 
-      <div className="relative z-[1] mt-2 sm:mt-3 lg:mt-3 flex justify-between items-center gap-2 font-mono text-[9px] sm:text-[10px] text-muted-foreground/80 px-0.5 min-w-0">
+      <div className="relative z-[1] mt-2 sm:mt-3 md:mt-3 flex justify-between items-center gap-2 font-mono text-[9px] sm:text-[10px] text-muted-foreground/80 px-0.5 min-w-0">
         <span className="truncate">SYS.IMG // {profile.name.toUpperCase().replace(/\s+/g, "_")}</span>
         <span className="text-cyan animate-pulse shrink-0">● ONLINE</span>
       </div>
@@ -88,7 +88,7 @@ function CodeCard({ profile }: { profile: ReturnType<typeof usePortfolio>["profi
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay: 0.05 }}
-      className="glass rounded-xl sm:rounded-2xl p-3.5 sm:p-5 lg:p-6 font-mono text-[11px] sm:text-sm space-y-1 sm:space-y-2 h-full min-h-full flex flex-1 flex-col justify-center min-w-0 w-full md:w-fit md:max-w-full"
+      className="glass rounded-xl sm:rounded-2xl p-3.5 sm:p-5 lg:p-6 font-mono text-[11px] sm:text-sm space-y-1 sm:space-y-2 h-full min-h-full flex flex-1 flex-col justify-center min-w-0 w-full"
     >
       <div>
         <span className="text-emerald">const</span> <span className="text-cyan">engineer</span> = {"{"}
@@ -132,15 +132,14 @@ export function About() {
           description="I'm Anurag — a software engineer who treats every product like a system. I care about the boring details that compound: caches that hit, queries that scan small, builds that don't flake, and UIs that don't lie about their state."
         />
 
-        <div className="flex flex-col gap-3 sm:gap-5 lg:gap-6">
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(200px,260px)_auto] gap-3 sm:gap-5 lg:gap-6 items-stretch w-full md:w-fit md:max-w-full">
-            <PhotoCard photoSrc={photoSrc} profile={profile} />
-            <div className="flex min-h-0 h-full">
-              <CodeCard profile={profile} />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[240px_1fr_440px] gap-3 sm:gap-5 lg:gap-6 items-stretch">
+          <PhotoCard photoSrc={photoSrc} profile={profile} />
+          
+          <div className="flex min-h-0 h-full">
+            <CodeCard profile={profile} />
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:col-span-2 lg:col-span-1 h-full">
             {PILLARS.map((p, i) => (
               <motion.div
                 key={p.title}
@@ -148,16 +147,15 @@ export function About() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.45, delay: i * 0.05 }}
-                className="glass glass-hover rounded-lg sm:rounded-xl p-2.5 sm:p-4 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-start min-w-0 h-full"
+                className="glass glass-hover rounded-lg sm:rounded-xl p-3 sm:p-4 flex flex-col justify-between gap-3 min-w-0 h-full"
               >
-                <div className="size-8 sm:size-10 rounded-md sm:rounded-lg bg-cyan/10 border border-cyan/30 text-cyan grid place-items-center shrink-0">
-                  <p.icon className="size-3.5 sm:size-[18px]" />
+                <div className="size-8 sm:size-9 rounded-md bg-cyan/10 border border-cyan/30 text-cyan grid place-items-center shrink-0">
+                  <p.icon className="size-4 sm:size-[18px]" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-xs sm:text-base leading-tight">{p.title}</h3>
-                  <p className="text-[10px] sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed">
-                    <span className="sm:hidden">{p.short}</span>
-                    <span className="hidden sm:inline">{p.text}</span>
+                <div className="min-w-0 flex-1 flex flex-col justify-end">
+                  <h3 className="font-semibold text-xs sm:text-sm leading-tight text-foreground">{p.title}</h3>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 leading-normal">
+                    {p.text}
                   </p>
                 </div>
               </motion.div>

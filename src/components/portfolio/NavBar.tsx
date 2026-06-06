@@ -18,8 +18,8 @@ const SECTION_IDS = LINKS.map((l) => l.id);
 
 function navLinkClass(isActive: boolean) {
   return isActive
-    ? "px-3 py-1.5 rounded-md text-cyan bg-cyan/10 border border-cyan/25 transition-colors"
-    : "px-3 py-1.5 rounded-md text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors";
+    ? "px-3 py-1 rounded-md text-cyan bg-cyan/10 border border-cyan/25 transition-colors"
+    : "px-3 py-1 rounded-md text-muted-foreground hover:text-cyan hover:bg-cyan/5 transition-colors";
 }
 
 function mobileLinkClass(isActive: boolean) {
@@ -62,20 +62,20 @@ export function NavBar() {
   return (
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? "py-2" : "py-3 sm:py-4"
+        scrolled ? "py-1.5" : "py-2.5 sm:py-3"
       }`}
     >
       <div className="section-container">
         <nav
-          className={`glass rounded-2xl flex items-center justify-between gap-2 px-3 sm:px-4 py-2 sm:py-2.5 min-w-0 ${
+          className={`glass rounded-2xl flex items-center justify-between gap-2 px-3 sm:px-4 py-1.5 min-w-0 ${
             scrolled ? "glow-cyan" : ""
           }`}
         >
           <a
-            href="#home"
+            href="/#home"
             className="flex items-center gap-2 font-mono text-xs sm:text-sm min-w-0 flex-1 sm:flex-none max-w-[58%] sm:max-w-none"
           >
-            <span className="grid place-items-center size-7 sm:size-8 shrink-0 rounded-md bg-cyan/10 border border-cyan/30 text-cyan">
+            <span className="grid place-items-center size-7 shrink-0 rounded-md bg-cyan/10 border border-cyan/30 text-cyan">
               <Terminal className="size-4" />
             </span>
             <span className="text-foreground/90 truncate">
@@ -87,7 +87,7 @@ export function NavBar() {
           <ul className="hidden lg:flex items-center gap-1 font-mono text-xs">
             {LINKS.map((l) => (
               <li key={l.id}>
-                <a href={`#${l.id}`} className={navLinkClass(activeId === l.id)}>
+                <a href={`/#${l.id}`} className={navLinkClass(activeId === l.id)}>
                   {l.label}
                 </a>
               </li>
@@ -96,15 +96,15 @@ export function NavBar() {
 
           <div className="flex items-center gap-2 shrink-0">
             <a
-              href="#contact"
-              className="font-mono text-xs px-3 py-2 min-h-11 rounded-md bg-cyan text-primary-foreground hover:bg-cyan-glow transition-colors glow-cyan hidden sm:inline-flex items-center"
+              href="/#contact"
+              className="font-mono text-xs px-3 py-1.5 min-h-9 rounded-md bg-cyan text-primary-foreground hover:bg-cyan-glow transition-colors glow-cyan hidden sm:inline-flex items-center"
             >
               sudo hire-me
             </a>
 
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden touch-target size-11 grid place-items-center rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
+              className="lg:hidden touch-target size-9 grid place-items-center rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
               aria-label="Toggle menu"
             >
               {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
@@ -125,7 +125,7 @@ export function NavBar() {
                 {LINKS.map((l) => (
                   <li key={l.id}>
                     <a
-                      href={`#${l.id}`}
+                      href={`/#${l.id}`}
                       onClick={() => setMobileOpen(false)}
                       className={mobileLinkClass(activeId === l.id)}
                     >
@@ -136,7 +136,7 @@ export function NavBar() {
               </ul>
               <div className="mt-3 pt-3 border-t border-border/60">
                 <a
-                  href="#contact"
+                  href="/#contact"
                   onClick={() => setMobileOpen(false)}
                   className="block text-center font-mono text-sm px-4 py-3 min-h-11 rounded-lg bg-cyan text-primary-foreground hover:bg-cyan-glow transition-colors glow-cyan"
                 >

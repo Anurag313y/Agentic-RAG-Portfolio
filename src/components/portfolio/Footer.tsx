@@ -6,8 +6,8 @@ export function Footer() {
   const { profile } = usePortfolio();
 
   return (
-    <footer className="py-8 sm:py-10 border-t border-border/60 pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <div className="section-container flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+    <footer className="py-4 sm:py-5 border-t border-border/60 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="section-container flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <div className="font-mono text-xs sm:text-sm max-w-full">
           <span className="text-emerald">$</span>{" "}
           <span className="text-foreground">{profile.name}</span>{" "}
@@ -26,7 +26,7 @@ export function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={s.label}
-              className="touch-target size-11 grid place-items-center rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
+              className="size-9 grid place-items-center rounded-lg border border-border hover:border-cyan/40 hover:text-cyan transition-colors"
             >
               <s.icon className="size-4" />
             </a>

@@ -56,10 +56,33 @@ export function Hero() {
           transition={{ duration: 0.6, ease: "easeOut" }}
           className="self-start w-full lg:self-stretch lg:flex lg:flex-col"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full glass font-mono text-xs text-cyan">
-            <span className="size-2 rounded-full bg-emerald animate-pulse" />
+          <motion.div
+            animate={{
+              borderColor: [
+                "rgba(34, 211, 238, 0.25)",
+                "rgba(34, 211, 238, 0.75)",
+                "rgba(34, 211, 238, 0.25)"
+              ],
+              boxShadow: [
+                "0 0 6px rgba(34, 211, 238, 0.1), inset 0 0 2px rgba(34, 211, 238, 0.05)",
+                "0 0 18px rgba(34, 211, 238, 0.5), inset 0 0 5px rgba(34, 211, 238, 0.2)",
+                "0 0 6px rgba(34, 211, 238, 0.1), inset 0 0 2px rgba(34, 211, 238, 0.05)"
+              ],
+              opacity: [0.85, 1, 0.85]
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="inline-flex items-center self-start gap-2 px-3 py-1 rounded-full border border-cyan/25 glass font-mono text-xs text-cyan cursor-default"
+          >
+            <span className="relative flex size-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75"></span>
+              <span className="relative inline-flex rounded-full size-2 bg-emerald"></span>
+            </span>
             online · available for work
-          </div>
+          </motion.div>
           <h1 className="mt-3 sm:mt-5 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05]">
             <span className="block text-foreground">{profile.name}</span>
             <span className="block text-gradient">{profile.role}</span>
@@ -89,17 +112,29 @@ export function Hero() {
             </a>
           </div>
 
-          {/* Secondary: switch hero-right to terminal mode */}
+          {/* Secondary: switch hero-right between terminal and jarvis modes */}
           <button
             type="button"
-            onClick={() => setMode("terminal")}
-            className="mt-5 sm:mt-6 inline-flex items-center gap-3 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-mono text-xs glass glass-hover group"
+            onClick={() => setMode(mode === "jarvis" ? "terminal" : "jarvis")}
+            className="mt-6 sm:mt-8 mb-5 sm:mb-6 inline-flex items-center self-start gap-3.5 px-4 py-2.5 rounded-lg font-mono text-xs glass glass-hover group cursor-pointer transition-all duration-300"
           >
-            <TerminalSquare className="size-4 text-cyan" />
-            <span className="text-muted-foreground">
-              <span className="text-emerald">$</span> Access Linux Environment
-            </span>
-            <span className="text-cyan opacity-70 group-hover:opacity-100 transition-opacity">→</span>
+            {mode === "jarvis" ? (
+              <>
+                <TerminalSquare className="size-4 text-cyan group-hover:scale-110 transition-transform duration-300" />
+                <span className="text-muted-foreground">
+                  <span className="text-emerald">$</span> Access Linux Environment
+                </span>
+                <span className="text-cyan opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">→</span>
+              </>
+            ) : (
+              <>
+                <Cpu className="size-4 text-emerald group-hover:rotate-45 transition-transform duration-500" />
+                <span className="text-muted-foreground">
+                  <span className="text-cyan">#</span> Sync J.A.R.V.I.S Protocol
+                </span>
+                <span className="text-emerald opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">→</span>
+              </>
+            )}
           </button>
 
           <div className="mt-6 sm:mt-8 lg:mt-auto grid grid-cols-3 max-w-md gap-1.5 sm:gap-3 font-mono w-full">
@@ -156,17 +191,15 @@ export function Hero() {
               >
                 <span
                   aria-hidden
-                  className={`absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 w-[calc(50%-4px)] rounded-full bg-cyan/15 border border-cyan/40 transition-all duration-300 ease-out ${
-                    mode === "jarvis" ? "left-0.5 sm:left-1" : "left-[calc(50%+0px)]"
-                  }`}
+                  className={`absolute top-0.5 sm:top-1 bottom-0.5 sm:bottom-1 w-[calc(50%-4px)] rounded-full bg-cyan/15 border border-cyan/40 transition-all duration-300 ease-out ${mode === "jarvis" ? "left-0.5 sm:left-1" : "left-[calc(50%+0px)]"
+                    }`}
                 />
                 <button
                   role="tab"
                   aria-selected={mode === "jarvis"}
                   onClick={() => setMode("jarvis")}
-                  className={`relative z-10 px-2.5 sm:px-3 py-2 min-h-9 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${
-                    mode === "jarvis" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`relative z-10 px-2.5 sm:px-3 py-2 min-h-9 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${mode === "jarvis" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <Cpu className="size-3 shrink-0" /> <span className="hidden xs:inline">J.A.R.V.I.S</span><span className="xs:hidden">AI</span>
                 </button>
@@ -174,66 +207,80 @@ export function Hero() {
                   role="tab"
                   aria-selected={mode === "terminal"}
                   onClick={() => setMode("terminal")}
-                  className={`relative z-10 px-2.5 sm:px-3 py-2 min-h-9 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${
-                    mode === "terminal" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`relative z-10 px-2.5 sm:px-3 py-2 min-h-9 rounded-full inline-flex items-center gap-1 sm:gap-1.5 transition-colors ${mode === "terminal" ? "text-cyan" : "text-muted-foreground hover:text-foreground"
+                    }`}
                 >
                   <TerminalSquare className="size-3 shrink-0" /> <span className="hidden xs:inline">Linux Terminal</span><span className="xs:hidden">CLI</span>
                 </button>
               </div>
             </div>
 
-            <div className="relative w-full min-h-[300px] sm:min-h-[380px] lg:min-h-0 lg:flex-1 lg:h-full">
+            <div className="relative w-full h-[460px] sm:h-[530px] lg:h-[550px]">
               <motion.div
                 key="jarvis"
                 initial={false}
                 animate={{ opacity: mode === "jarvis" ? 1 : 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className={`flex h-full min-h-full flex-col justify-between w-full ${
-                  mode === "jarvis"
-                    ? "relative z-10"
-                    : "absolute inset-0 z-0 opacity-0 pointer-events-none"
-                }`}
+                className={`flex h-full min-h-full flex-col justify-between w-full ${mode === "jarvis"
+                  ? "relative z-10"
+                  : "absolute inset-0 z-0 opacity-0 pointer-events-none"
+                  }`}
                 aria-hidden={mode !== "jarvis"}
               >
                 <div className="flex flex-col flex-1 justify-center min-h-0">
-                  {/* Voice toggle (floating, no card) */}
-                  <div className="flex items-center justify-end mb-1 lg:mb-0.5 shrink-0">
+                  {/* Hologram core — labels on outer frame; speaker inset for a small gap */}
+                  <div className="relative aspect-square w-full max-w-[min(92vw,300px)] xs:max-w-[320px] sm:max-w-[350px] md:max-w-[min(100%,380px)] lg:max-w-[min(100%,400px)] xl:max-w-[420px] mx-auto">
+                    {/* ── HUD chips: 8-point compass, hugging the outer ring ── */}
+
+                    {/* TOP-LEFT */}
+                    <div className="pointer-events-none absolute left-[11%] top-[11%] font-mono text-[8px] sm:text-[9.5px] text-cyan/80 tracking-widest leading-none whitespace-nowrap">
+                      SYS·4A1F
+                    </div>
+
+                    {/* TOP-RIGHT */}
+                    <div className="pointer-events-none absolute right-[11%] top-[11%] font-mono text-[8px] sm:text-[9.5px] text-emerald/85 tracking-widest leading-none text-right whitespace-nowrap">
+                      LINK·SEC
+                    </div>
+
+                    {/* BOTTOM-LEFT */}
+                    <div className="pointer-events-none absolute left-[11%] bottom-[11%] font-mono text-[8px] sm:text-[9.5px] text-cyan/70 tracking-widest leading-none whitespace-nowrap">
+                      21.4·KHZ
+                    </div>
+
+                    {/* BOTTOM-RIGHT — interactive voice toggle */}
                     <button
                       onClick={() => {
                         if (!voiceOn) setVoiceOn(true);
-                        else {
-                          setVoiceOn(false);
-                          cancelVoice();
-                        }
+                        else { setVoiceOn(false); cancelVoice(); }
                       }}
-                      className="text-[11px] text-muted-foreground hover:text-cyan inline-flex items-center gap-1.5 font-mono min-h-8 px-2 rounded-md"
+                      className="absolute right-[11%] bottom-[11%] font-mono text-[8px] sm:text-[9.5px] text-cyan/80 tracking-widest leading-none text-right cursor-pointer z-20 flex items-center gap-1 hover:text-cyan transition-colors whitespace-nowrap"
                       aria-label="toggle voice output"
                     >
-                      {voiceOn ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
-                      {voiceOn ? "voice on" : "voice off"}
+                      {voiceOn
+                        ? <><Volume2 className="size-2.5 text-cyan animate-pulse" />VOICE·ON</>
+                        : <><VolumeX className="size-2.5 text-cyan/50" />VOICE·OFF</>}
                     </button>
-                  </div>
 
-                  {/* Hologram core — labels on outer frame; speaker inset for a small gap */}
-                  <div className="relative aspect-square w-full max-w-[min(92vw,300px)] xs:max-w-[320px] sm:max-w-[350px] md:max-w-[min(100%,380px)] lg:max-w-[min(100%,400px)] xl:max-w-[420px] mx-auto">
-                    {/* Micro HUD chips — fixed corners, left/right pairs share the same inset */}
-                    <div className="pointer-events-none absolute inset-x-2 top-2 sm:inset-x-2.5 sm:top-2.5 flex justify-between items-start gap-2">
-                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/70 tracking-widest leading-none">
-                        SYS · 0x4A1F
-                      </span>
-                      <span className="font-mono text-[8px] sm:text-[9px] text-emerald/80 tracking-widest leading-none text-right">
-                        ◉ LINK OK
-                      </span>
+                    {/* LEFT MID */}
+                    <div className="pointer-events-none absolute left-[5%] top-1/2 -translate-y-1/2 font-mono text-[7px] sm:text-[8px] text-cyan/45 tracking-widest leading-none whitespace-nowrap">
+                      CPU·OK
                     </div>
-                    <div className="pointer-events-none absolute inset-x-2 bottom-2 sm:inset-x-2.5 sm:bottom-2.5 flex justify-between items-end gap-2">
-                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest leading-none">
-                        FREQ 21.4kHz
-                      </span>
-                      <span className="font-mono text-[8px] sm:text-[9px] text-cyan/60 tracking-widest leading-none text-right">
-                        CORE · STABLE
-                      </span>
+
+                    {/* RIGHT MID */}
+                    <div className="pointer-events-none absolute right-[5%] top-1/2 -translate-y-1/2 font-mono text-[7px] sm:text-[8px] text-cyan/45 tracking-widest leading-none text-right whitespace-nowrap">
+                      MEM·64G
                     </div>
+
+                    {/* TOP CENTER */}
+                    <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-[5%] font-mono text-[7px] sm:text-[8px] text-cyan/40 tracking-widest leading-none whitespace-nowrap">
+                      HUD·ACT
+                    </div>
+
+                    {/* BOTTOM CENTER */}
+                    <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[5%] font-mono text-[7px] sm:text-[8px] text-emerald/60 tracking-widest leading-none whitespace-nowrap">
+                      CORE·STB
+                    </div>
+
 
                     {/* Speaker + rings — inset leaves a thin gap before corner labels */}
                     <div className="absolute inset-[9%] sm:inset-[8%] grid place-items-center">
@@ -273,9 +320,8 @@ export function Hero() {
                         </svg>
 
                         <div
-                          className={`absolute size-[58%] rounded-full bg-cyan/15 blur-2xl pulse-ring ${
-                            state === "listening" ? "!bg-cyan/40" : ""
-                          } ${state === "processing" ? "!bg-yellow-400/25" : ""}`}
+                          className={`absolute size-[58%] rounded-full bg-cyan/15 blur-2xl pulse-ring ${state === "listening" ? "!bg-cyan/40" : ""
+                            } ${state === "processing" ? "!bg-yellow-400/25" : ""}`}
                         />
 
                         <button
@@ -381,11 +427,10 @@ export function Hero() {
                 initial={false}
                 animate={{ opacity: mode === "terminal" ? 1 : 0 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className={`flex h-full min-h-full flex-col w-full ${
-                  mode === "terminal"
-                    ? "relative z-10"
-                    : "absolute inset-0 z-0 opacity-0 pointer-events-none"
-                }`}
+                className={`flex h-full min-h-full flex-col w-full ${mode === "terminal"
+                  ? "relative z-10"
+                  : "absolute inset-0 z-0 opacity-0 pointer-events-none"
+                  }`}
                 aria-hidden={mode !== "terminal"}
               >
                 <HeroTerminal content={content} />
