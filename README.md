@@ -55,7 +55,7 @@ copy .dev.vars.example .dev.vars
 # macOS/Linux: cp .dev.vars.example .dev.vars
 
 # 2. Edit .dev.vars — at minimum set ADMIN_EMAIL and ADMIN_PASSWORD
-#    Optional: RESEND_*, DEEPGRAM_API_KEY, GEMINI_API_KEY, COHERE_API_KEY
+#    Optional: RESEND_*, DEEPGRAM_API_KEY, COHERE_API_KEY
 
 # 3. Build and start
 npm run docker:up
@@ -124,7 +124,7 @@ All application code is inside **`Anurag313y/`**. The repo root only contains wr
                     │                     │                     │
           ┌─────────▼─────────┐ ┌─────────▼─────────┐ ┌─────────▼─────────┐
           │    D1 SQLite      │ │    KV cache       │ │  External APIs    │
-          │  portfolio · auth │ │  content · limits │ │ Deepgram · Gemini │
+          │  portfolio · auth │ │  content · limits │ │ Deepgram · Cohere │
           │  contact messages │ │                   │ │      Cohere       │
           └───────────────────┘ └───────────────────┘ └───────────────────┘
 ```
@@ -163,7 +163,7 @@ Portfolio content path:
 1. Read from KV cache when possible (5-min TTL)
 2. Fallback to D1
 3. Merged with defaults from `portfolio-defaults.ts`
-4. API keys (Gemini/Cohere) stripped before sending public content
+4. API keys (Cohere/Deepgram) stripped before sending public content
 
 ---
 
@@ -185,8 +185,8 @@ TanStack Router uses file-based routes. Portfolio content is loaded in route loa
 
 - **Dynamic portfolio** — Edit profile, projects, skills, and experience from `/admin`, stored in D1
 - **Contact form** — Validated server-side with Zod, emailed to your Admin → Profile email via Resend, archived in D1
-- **JARVIS voice assistant** — Deepgram STT + TTS, portfolio-aware replies via Gemini/Cohere or static fallback
-- **AI config** — Admin can store Gemini/Cohere API keys and choose a primary model; keys are admin-only
+- **JARVIS voice assistant** — Deepgram STT + TTS, portfolio-aware replies via Cohere RAG or static fallback
+- **AI config** — Admin can store Deepgram/Cohere API keys; keys are admin-only
 - **Interactive terminal** — Client-side command simulation on the homepage (static, not AI-powered)
 - **Resume download** — PDF served from `public/resume.pdf`
 - **Cloudflare-native** — Single Worker handles SSR, API, and static assets
@@ -241,8 +241,7 @@ Configured in `wrangler.jsonc`:
 | Service | Purpose |
 |---|---|
 | **Deepgram** | Speech-to-text (live WebSocket) + text-to-speech |
-| **Google Gemini** | Portfolio-aware conversational replies |
-| **Cohere** | Alternative LLM (configurable in admin) |
+| **Cohere** | Portfolio-aware conversational replies + RAG embeddings |
 
 ### Developer Tooling
 
@@ -274,8 +273,7 @@ Copy `Anurag313y/.dev.vars.example` to `Anurag313y/.dev.vars`:
 | `RESEND_API_KEY` | For contact form | Sends contact messages to **Admin → Profile & Contact** email |
 | `RESEND_FROM` | Recommended | Verified sender, e.g. `Portfolio <hello@yourdomain.com>` |
 | `DEEPGRAM_API_KEY` | For voice | JARVIS STT + TTS + auth grant |
-| `GEMINI_API_KEY` | Optional | AI replies (or set in admin UI) |
-| `COHERE_API_KEY` | Optional | AI replies (or set in admin UI) |
+| `COHERE_API_KEY` | Optional | AI replies + RAG embeddings (or set in admin UI) |
 
 Never commit `.dev.vars` to Git — it is already in `.gitignore`.
 
@@ -288,7 +286,6 @@ wrangler secret put ADMIN_PASSWORD
 wrangler secret put RESEND_API_KEY
 wrangler secret put RESEND_FROM       # optional but required for custom domains
 wrangler secret put DEEPGRAM_API_KEY
-wrangler secret put GEMINI_API_KEY    # optional
 wrangler secret put COHERE_API_KEY    # optional
 ```
 
@@ -296,7 +293,7 @@ wrangler secret put COHERE_API_KEY    # optional
 
 **Admin UI (API panel)** — stored in D1, never in public content:
 
-- `geminiApiKey`, `cohereApiKey`, `primaryModel` (`gemini` | `cohere` | `static`)
+- `cohereApiKey`, `primaryModel` (`cohere` | `static`)
 - `jarvisEnabled` (kill switch)
 - `deepgramSttModel`, `deepgramTtsModel` (optional tuning)
 
@@ -343,20 +340,22 @@ D1 tables (defined in `Anurag313y/src/db/schema.ts`):
 | `admin_users` | Admin accounts |
 | `sessions` | Login sessions |
 | `contact_messages` | Contact form submissions |
+| `rag_chunks` | RAG embedding chunks (Cohere vectors + portfolio text) |
 
-Migrations live in `Anurag313y/drizzle/migrations/` and are applied with `wrangler d1 migrations apply`.
+Migrations live in `drizzle/migrations/` and are applied with `wrangler d1 migrations apply`.
 
 ---
 
 ## JARVIS Voice Assistant
 
-JARVIS lets visitors ask questions about the portfolio using their microphone. Deepgram handles speech ↔ text; Gemini/Cohere (or static fallback) generates portfolio-aware replies. API keys are proxied through Cloudflare Workers — never exposed to the browser.
+JARVIS lets visitors ask questions about the portfolio using their microphone. Deepgram handles speech ↔ text; Cohere (with RAG) or static fallback generates portfolio-aware replies. API keys are proxied through Cloudflare Workers — never exposed to the browser.
 
 **How it works:**
 
-1. User speaks → Deepgram converts speech to text (browser WebSocket + short-lived JWT)
-2. Text sent to server → Gemini/Cohere generates a portfolio-aware reply
-3. Reply converted to speech → Deepgram TTS plays natural voice audio
+1. User speaks → browser records audio via `MediaRecorder`
+2. Audio sent to server → Deepgram pre-recorded STT returns transcript
+3. Text sent to server → Cohere generates a RAG-enhanced portfolio-aware reply
+4. Reply converted to speech → Deepgram TTS plays natural voice audio
 
 ### JARVIS architecture
 
@@ -365,7 +364,7 @@ flowchart TB
   subgraph Browser["Client — Browser"]
     User((User))
     Hero["Hero.tsx<br/>JARVIS UI"]
-    Hook["use-jarvis-voice.ts<br/>@deepgram/sdk"]
+    Hook["use-jarvis-voice.ts<br/>MediaRecorder"]
     User --> Hero
     Hero --> Hook
   end
@@ -373,36 +372,39 @@ flowchart TB
   subgraph Cloudflare["Cloudflare Edge"]
     Worker["TanStack Start Worker<br/>server.ts"]
     subgraph Functions["Jarvis Server Functions"]
-      TokenFn["getDeepgramToken"]
+      SttFn["transcribeJarvisSpeech"]
       AskFn["askJarvis"]
       TtsFn["synthesizeJarvisSpeech"]
     end
-    D1[("D1 SQLite<br/>portfolio-db")]
-    KV[("KV<br/>cache + rate limit")]
+    RAG["rag.server.ts<br/>chunk · embed · search"]
+    D1[("D1 SQLite<br/>portfolio + rag_chunks")]
+    KV[("KV<br/>cache · rate limit · RAG status")]
     Worker --> Functions
+    Functions --> RAG
+    RAG --> D1
     Functions --> D1
     Functions --> KV
+    RAG --> KV
   end
 
   subgraph APIs["External APIs"]
-    Deepgram["Deepgram<br/>STT · TTS · auth grant"]
-    LLM["Gemini / Cohere<br/>portfolio-aware replies"]
+    Deepgram["Deepgram<br/>STT · TTS"]
+    Cohere["Cohere<br/>chat + embed"]
   end
 
   Hook -->|"server fn calls"| Worker
-  Hook -->|"WebSocket STT<br/>Bearer JWT"| Deepgram
-  TokenFn -->|"POST /v1/auth/grant"| Deepgram
+  SttFn -->|"POST /v1/listen"| Deepgram
   TtsFn -->|"POST /v1/speak"| Deepgram
-  AskFn -->|"chat + system prompt"| LLM
-  AskFn -->|"load content"| D1
+  AskFn -->|"RAG retrieve + chat"| Cohere
+  RAG -->|"embed on save"| Cohere
 ```
 
 | Layer | Components | Role |
 |---|---|---|
-| **Client** | `Hero.tsx`, `use-jarvis-voice.ts` | Mic capture, live transcript UI, audio playback |
-| **Worker** | `jarvis.functions.ts`, `jarvis.server.ts`, `deepgram.server.ts`, `llm.server.ts` | Proxy secrets, LLM routing, rate limits |
-| **Cloudflare data** | D1, KV | Portfolio content, sessions, cache, per-IP limits |
-| **External** | Deepgram, Gemini/Cohere | Speech ↔ text, natural language answers |
+| **Client** | `Hero.tsx`, `use-jarvis-voice.ts` | Mic capture, transcript UI, audio playback |
+| **Worker** | `jarvis.functions.ts`, `jarvis.server.ts`, `deepgram.server.ts`, `llm.server.ts`, `rag.server.ts` | Proxy secrets, RAG, LLM routing, rate limits |
+| **Cloudflare data** | D1, KV | Portfolio content, RAG chunks, sessions, cache, per-IP limits |
+| **External** | Deepgram, Cohere | Speech ↔ text, chat + embeddings |
 
 ### Voice request flow
 
@@ -412,44 +414,42 @@ sequenceDiagram
   participant Hero as Hero_Jarvis_UI
   participant Worker as Cloudflare_Worker
   participant DG as Deepgram
-  participant LLM as Gemini_or_Cohere
+  participant Cohere as Cohere_API
 
-  User->>Hero: Tap mic
-  Hero->>Worker: getDeepgramToken()
-  Worker->>DG: POST /v1/auth/grant
-  DG-->>Worker: JWT access_token
-  Worker-->>Hero: short-lived token
-
-  Hero->>DG: WebSocket STT listen (Bearer JWT)
-  DG-->>Hero: interim + final transcript
+  User->>Hero: Tap mic (record)
+  Hero->>Worker: transcribeJarvisSpeech(audio)
+  Worker->>DG: POST /v1/listen
+  DG-->>Worker: transcript
+  Worker-->>Hero: transcript text
 
   Hero->>Worker: askJarvis(message, history?)
-  Worker->>LLM: chat with portfolio system prompt
-  LLM-->>Worker: reply text
+  Worker->>Cohere: embed query + retrieve top chunks from D1
+  Worker->>Cohere: chat with RAG system prompt
+  Cohere-->>Worker: reply text
   Worker-->>Hero: reply + optional actions
 
   Hero->>Worker: synthesizeJarvisSpeech(text)
   Worker->>DG: POST /v1/speak
   DG-->>Worker: audio bytes
-  Worker-->>Hero: audio blob URL
+  Worker-->>Hero: audio blob (base64)
   Hero->>User: Play natural voice
 ```
 
-**Why two paths to Deepgram?**
+**Why server-proxied Deepgram?**
 
 | Concern | Approach |
 |---|---|
-| **STT latency** | Live WebSocket from the **browser** using a **temporary JWT** from your Worker — never ship the main API key to the client |
-| **TTS** | **Server-proxied** `POST /v1/speak` keeps billing and control on the Worker |
+| **API key security** | Main Deepgram key stays on the Worker — never sent to the browser |
+| **STT + TTS control** | Server handles billing, model selection, and rate limits centrally |
 
 ### Hero UI states
 
 `Anurag313y/src/components/portfolio/Hero.tsx`:
 
 - States: `ready` → `listening` → `processing` → `responding`
-- **STT:** Deepgram live WebSocket via `@deepgram/sdk` + short-lived JWT from Worker
+- **STT:** `MediaRecorder` → server `transcribeJarvisSpeech` → Deepgram pre-recorded API
 - **TTS:** Server-proxied Deepgram Aura voice (`synthesizeJarvisSpeech`)
-- **Brain:** Server-side `askJarvis` → Gemini / Cohere / static fallback
+- **Brain:** Server-side `askJarvis` → Cohere RAG / static fallback
 - Suggestion chips call text-only `handleQuery(text)`
 
 ### APIs & keys
@@ -458,19 +458,19 @@ sequenceDiagram
 
 | Purpose | Endpoint | Auth |
 |---|---|---|
-| Grant temp token (browser STT) | `POST https://api.deepgram.com/v1/auth/grant` | `Authorization: Token <DEEPGRAM_API_KEY>` |
-| Live STT (browser) | `wss://api.deepgram.com/v1/listen?model=nova-3&...` | `Authorization: Bearer <JWT>` |
+| STT (server) | `POST https://api.deepgram.com/v1/listen?model=nova-3` | `Authorization: Token <DEEPGRAM_API_KEY>` |
 | TTS (server) | `POST https://api.deepgram.com/v1/speak?model=aura-2-thalia-en&encoding=mp3` | `Authorization: Token <DEEPGRAM_API_KEY>` |
 
 Get a key from [Deepgram Console](https://console.deepgram.com/). Suggested models: STT `nova-3`, TTS `aura-2-thalia-en`.
 
-#### Conversational brain (recommended)
+#### Conversational brain + RAG
 
 | Provider | When to use |
 |---|---|
-| **Google Gemini** | Admin `primaryModel: gemini` — [Google AI Studio](https://aistudio.google.com/apikey) |
-| **Cohere** | Admin `primaryModel: cohere` |
-| **Static fallback** | `primaryModel: static` or missing keys |
+| **Cohere** | Admin `primaryModel: cohere` — chat (`command-r-08-2024`) + embeddings (`embed-english-v3.0`) for RAG |
+| **Static fallback** | `primaryModel: static` or missing Cohere key |
+
+RAG indexes portfolio sections + Knowledge Base into D1 on every admin save. At query time, hybrid retrieval combines semantic search with intent-based chunk boosting.
 
 #### Browser (no keys)
 
@@ -484,15 +484,16 @@ Get a key from [Deepgram Console](https://console.deepgram.com/). Suggested mode
 | `src/lib/api/jarvis.functions.ts` | `createServerFn` endpoints |
 | `src/lib/jarvis.server.ts` | Deepgram token grant, TTS proxy, LLM routing |
 | `src/lib/deepgram.server.ts` | Fetch wrappers for grant + speak |
-| `src/lib/llm.server.ts` | Gemini + Cohere adapters + system prompt builder |
+| `src/lib/llm.server.ts` | Cohere adapter + RAG/full-context prompt builder |
+| `src/lib/rag.server.ts` | Chunking, Cohere embeddings, D1 storage, hybrid retrieval |
 | `src/lib/jarvis-answer.server.ts` | Static fallback answers |
 | `src/lib/jarvis-actions.ts` | Structured scroll / resume actions |
 
 **Server functions (public, rate-limited):**
 
-1. **`getDeepgramToken`** — `POST /v1/auth/grant` → `{ accessToken, expiresIn }`
-2. **`askJarvis`** — `{ message, history? }` → loads portfolio context, calls LLM, returns `{ text, actions? }`
-3. **`synthesizeJarvisSpeech`** — `{ text }` → returns `audio/mpeg` bytes
+1. **`transcribeJarvisSpeech`** — `{ audioBase64, mimeType }` → Deepgram STT transcript
+2. **`askJarvis`** — `{ message, history? }` → RAG retrieval + Cohere chat, returns `{ text, actions? }`
+3. **`synthesizeJarvisSpeech`** — `{ text }` → returns `audio/mpeg` bytes (base64)
 
 **Rate limiting** (Cloudflare KV): max **30** `askJarvis` + **60** TTS requests per IP per hour → `429` when exceeded.
 
@@ -502,11 +503,11 @@ Hook: `Anurag313y/src/hooks/use-jarvis-voice.ts`
 
 | Step | Behavior |
 |---|---|
-| Start listen | Request mic → `getDeepgramToken()` → open Deepgram live connection |
-| Stop / finalize | Close WS, send transcript to `askJarvis` |
-| Respond | Play audio from `synthesizeJarvisSpeech` via `URL.createObjectURL` |
+| Start listen | Request mic → `MediaRecorder` captures audio chunks |
+| Stop / finalize | Stop recorder → `transcribeJarvisSpeech` → `askJarvis` |
+| Respond | Play audio from `synthesizeJarvisSpeech` via blob URL |
 | Actions | Map `scrollTo` ids to `scrollIntoView` / `window.open` for resume |
-| Errors | Toast + revert to `ready`; re-fetch token if expired |
+| Errors | Toast + revert to `ready` |
 
 ### System prompt (JARVIS personality)
 
@@ -517,14 +518,14 @@ Short answers for voice (1–3 sentences), first-person as assistant, only portf
 1. Add `DEEPGRAM_API_KEY` to `.dev.vars`
 2. Run `npm run dev`
 3. Chrome/Edge: grant mic → speak → hear Aura voice reply
-4. Admin: set `primaryModel` to `gemini`, save key, ask open-ended question
+4. Admin: set `primaryModel` to `cohere`, save Cohere key, verify RAG index status
 5. Verify public `getPortfolioContent` has **no** API keys
 6. Production: `wrangler secret put DEEPGRAM_API_KEY` then smoke test
 
 | Service | What you get | Used for |
 |---|---|---|
-| **Deepgram** | API key | STT, TTS, temp tokens |
-| **Gemini** or **Cohere** | API key | Natural language answers |
+| **Deepgram** | API key | STT, TTS |
+| **Cohere** | API key | Chat + RAG embeddings |
 | **Browser** | Mic permission | Audio capture |
 
 ### Implementation status
@@ -533,8 +534,9 @@ Short answers for voice (1–3 sentences), first-person as assistant, only portf
 |---|---|---|
 | **1** | Worker secrets + `getDeepgramToken` + live STT in Hero | Done |
 | **2** | `synthesizeJarvisSpeech` + replace `speechSynthesis` | Done |
-| **3** | `askJarvis` + Gemini/Cohere + structured scroll actions | Done |
+| **3** | `askJarvis` + Cohere + structured scroll actions | Done |
 | **4** | KV rate limits + admin kill switch + error/fallback UX | Done |
+| **5** | RAG pipeline (chunk · embed · D1 · hybrid retrieval) + admin index status | Done |
 
 ---
 
@@ -583,7 +585,7 @@ copy .dev.vars.example .dev.vars
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` (required)
 - `RESEND_API_KEY`, `RESEND_FROM` (contact form)
 - `DEEPGRAM_API_KEY` (JARVIS voice)
-- Optional: `GEMINI_API_KEY`, `COHERE_API_KEY`
+- Optional: `COHERE_API_KEY`
 
 For `docker run` without Compose, use `docker/.env.example` → `docker/.env` with `--env-file docker/.env`.
 
@@ -651,6 +653,20 @@ Suggested container port:
 > Note: Cloudflare Workers deployment to the edge should still use `wrangler deploy` as documented in the existing README “Deployment” section.
 
 ---
+RAG improvements (Cohere)
+Improvement	What changed
+Hybrid retrieval
+Semantic top-5 + focus-based chunks (projects → project chunks, etc.)
+Query embed cache
+KV cache (1h TTL) avoids re-embedding repeat questions
+Batch D1 writes
+Re-index uses Drizzle db.batch() (25 inserts per batch)
+Index status tracking
+KV stores idle / indexing / ready / failed / unconfigured
+Admin status UI
+Live badge + auto-poll while indexing + manual re-index
+API
+getRagIndexStatus + reindexRag returns status
 
 
 ## Development Notes

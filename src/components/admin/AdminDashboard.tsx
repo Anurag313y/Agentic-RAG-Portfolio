@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Briefcase,
@@ -20,12 +20,16 @@ import {
   X,
   Key,
   BookOpen,
+  RefreshCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { adminLogout } from "@/lib/api/auth.functions";
+import type { RagIndexStatus } from "@/lib/content.types";
 import {
   getAdminContent,
+  getRagIndexStatus,
   updatePortfolioContent,
+  reindexRag,
 } from "@/lib/api/portfolio.functions";
 import type { AdminContent } from "@/lib/admin-store";
 import { JARVIS_KNOWLEDGE_BASE_MAX, PORTFOLIO_QUERY_KEY } from "@/lib/content.types";
@@ -73,7 +77,6 @@ export function AdminDashboard({
       ...next,
       deepgramApiKey: next.deepgramApiKey?.trim() || content.deepgramApiKey || "",
       cohereApiKey: next.cohereApiKey?.trim() || content.cohereApiKey || "",
-      geminiApiKey: next.geminiApiKey?.trim() || content.geminiApiKey || "",
     };
     setContent(merged);
     setSaving(true);
@@ -867,7 +870,7 @@ function KnowledgeBasePanel({
     <div>
       <PanelHeader
         title="JARVIS Knowledge Base"
-        desc="Store facts about you in plain text. When Primary model is Cohere (or Gemini), JARVIS answers from this knowledge base plus your portfolio sections."
+        desc="Store facts about you in plain text. When Primary model is Cohere, JARVIS answers from this knowledge base plus your portfolio sections via RAG."
       />
       <div className="mb-4 rounded-lg border border-cyan/25 bg-cyan/5 px-3 py-2 text-xs text-muted-foreground leading-relaxed">
         <p className="text-foreground/90 font-medium mb-1">What to add</p>
@@ -970,6 +973,175 @@ function SecretKeyField({
   );
 }
 
+function ragIndexingPercent(status: RagIndexStatus): number {
+  if (!status.totalChunks || status.processedChunks == null) return 0;
+  if (status.processedChunks > 0) {
+    return Math.min(100, Math.round((status.processedChunks / status.totalChunks) * 100));
+  }
+  if (status.phase === "persisting") return 92;
+  if (status.phase === "embedding") return 4;
+  if (status.phase === "preparing") return 1;
+  return 0;
+}
+
+function ragStatusLabel(status: RagIndexStatus): string {
+  switch (status.state) {
+    case "indexing": {
+      if (status.totalChunks && status.processedChunks != null && status.processedChunks > 0) {
+        const pct = ragIndexingPercent(status);
+        return `Embedding ${status.processedChunks}/${status.totalChunks} chunks (${pct}%)…`;
+      }
+      if (status.phase === "persisting") {
+        return `Saving ${status.totalChunks ?? ""} chunks to database…`;
+      }
+      if (status.phase === "embedding") {
+        return `Calling Cohere embed API (0/${status.totalChunks ?? "?"} done)…`;
+      }
+      return `Preparing ${status.totalChunks ?? ""} chunks…`;
+    }
+    case "ready":
+      if (status.skipped && status.chunkCount > 0) {
+        return `Up to date — ${status.chunkCount} chunks (skipped, content unchanged)`;
+      }
+      if (status.chunkCount > 0) {
+        return `Ready — ${status.chunkCount} chunks indexed`;
+      }
+      return "Ready — no content to index";
+    case "failed":
+      return status.error ? `Failed — ${status.error}` : "Indexing failed";
+    case "unconfigured":
+      return "Cohere API key required";
+    default:
+      return "Not indexed yet";
+  }
+}
+
+function ragStatusTone(status: RagIndexStatus): string {
+  switch (status.state) {
+    case "ready":
+      return "border-emerald/35 bg-emerald/10 text-emerald";
+    case "indexing":
+      return "border-cyan/35 bg-cyan/10 text-cyan";
+    case "failed":
+      return "border-destructive/35 bg-destructive/10 text-destructive";
+    case "unconfigured":
+      return "border-yellow-500/35 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400";
+    default:
+      return "border-border/70 bg-background/40 text-muted-foreground";
+  }
+}
+
+function RagIndexSection() {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<RagIndexStatus | null>(null);
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const next = await getRagIndexStatus();
+      setStatus(next);
+    } catch {
+      /* ignore — badge stays on last known state */
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus]);
+
+  useEffect(() => {
+    if (status?.state !== "indexing") return;
+    const timer = window.setInterval(() => {
+      void refreshStatus();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [status?.state, refreshStatus]);
+
+  const pollUntilRagSettled = useCallback(async (): Promise<RagIndexStatus | null> => {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const next = await getRagIndexStatus();
+      setStatus(next);
+      if (next.state === "ready" || next.state === "failed") {
+        return next;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    return null;
+  }, []);
+
+  const handleReindex = async () => {
+    setLoading(true);
+    try {
+      const result = await reindexRag();
+
+      if (!result.started) {
+        setStatus(result.status);
+        if (result.status.state === "unconfigured") {
+          toast.info("No Cohere API key set — add your key above and save first.");
+        }
+        return;
+      }
+
+      setStatus(result.status);
+      const final = await pollUntilRagSettled();
+      if (!final) {
+        toast.error("Indexing is taking longer than expected. Check terminal [rag] logs.");
+        return;
+      }
+      if (final.state === "failed") {
+        toast.error(final.error ?? "Re-indexing failed. Check your Cohere API key.");
+        return;
+      }
+      if (final.skipped) {
+        toast.info(`RAG up to date — ${final.chunkCount} chunks (content unchanged).`);
+      } else {
+        toast.success(`RAG re-indexed: ${final.chunkCount} chunks embedded.`);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : "Re-indexing failed. Check your Cohere API key and try again.";
+      toast.error(message);
+      await refreshStatus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {status && (
+        <div
+          className={`rounded-lg border px-3 py-2 text-xs font-mono ${ragStatusTone(status)}`}
+        >
+          {ragStatusLabel(status)}
+          {status.state === "indexing" && status.totalChunks != null && (
+            <div className="mt-2 h-1.5 w-full rounded-full bg-background/60 overflow-hidden">
+              <div
+                className="h-full bg-cyan transition-all duration-300"
+                style={{ width: `${ragIndexingPercent(status)}%` }}
+              />
+            </div>
+          )}
+          {status.updatedAt > 0 && status.state !== "indexing" && (
+            <span className="block mt-0.5 opacity-70">
+              Updated {new Date(status.updatedAt).toLocaleString()}
+            </span>
+          )}
+        </div>
+      )}
+      <button
+        onClick={handleReindex}
+        disabled={loading || status?.state === "indexing"}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-cyan/40 text-cyan hover:bg-cyan/10 text-sm font-mono disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+      >
+        <RefreshCcw className={`size-4 ${loading || status?.state === "indexing" ? "animate-spin" : ""}`} />
+        {loading || status?.state === "indexing" ? "Re-indexing…" : "Re-index RAG"}
+      </button>
+    </div>
+  );
+}
+
 function ApiPanel({
   content,
   onSave,
@@ -978,10 +1150,9 @@ function ApiPanel({
   onSave: (c: AdminContent) => void;
 }) {
   const [deepgramApiKey, setDeepgramApiKey] = useState("");
-  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [cohereApiKey, setCohereApiKey] = useState("");
   const [primaryModel, setPrimaryModel] = useState<AdminContent["primaryModel"]>(
-    content.primaryModel ?? "static",
+    content.primaryModel === "cohere" ? "cohere" : "static",
   );
   const [jarvisEnabled, setJarvisEnabled] = useState(content.jarvisEnabled !== false);
   const [deepgramSttModel, setDeepgramSttModel] = useState(content.deepgramSttModel ?? "nova-3");
@@ -989,12 +1160,10 @@ function ApiPanel({
     content.deepgramTtsModel ?? "aura-2-thalia-en",
   );
   const [showDeepgram, setShowDeepgram] = useState(false);
-  const [showGemini, setShowGemini] = useState(false);
   const [showCohere, setShowCohere] = useState(false);
 
   const deepgramConfigured = Boolean(deepgramApiKey.trim() || content.deepgramApiKey?.trim());
   const cohereConfigured = Boolean(cohereApiKey.trim() || content.cohereApiKey?.trim());
-  const geminiConfigured = Boolean(geminiApiKey.trim() || content.geminiApiKey?.trim());
 
   return (
     <div>
@@ -1006,7 +1175,6 @@ function ApiPanel({
       <div className="mb-5 flex flex-wrap gap-2">
         <KeyStatus configured={deepgramConfigured} label="Deepgram" />
         <KeyStatus configured={cohereConfigured} label="Cohere" />
-        <KeyStatus configured={geminiConfigured} label="Gemini" />
       </div>
 
       <div className="mb-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed">
@@ -1065,9 +1233,9 @@ function ApiPanel({
 
         <section className="space-y-4 rounded-xl border border-border/60 bg-background/20 p-4">
           <div>
-            <h3 className="text-sm font-semibold">Language models</h3>
+            <h3 className="text-sm font-semibold">AI — Cohere</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Choose a primary model and add the matching API key for AI-powered JARVIS replies.
+              Powers JARVIS conversational replies and RAG semantic search over your portfolio.
             </p>
           </div>
 
@@ -1079,12 +1247,11 @@ function ApiPanel({
               className="mt-1 w-full rounded-lg border border-border/70 bg-background/50 px-3 py-2 text-sm outline-none focus:border-cyan/50"
             >
               <option value="static">Static (no AI)</option>
-              <option value="gemini">Gemini</option>
-              <option value="cohere">Cohere (uses Knowledge Base)</option>
+              <option value="cohere">Cohere (RAG + Knowledge Base)</option>
             </select>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              For AI answers from your Knowledge Base tab, choose Cohere or Gemini and save a valid
-              API key.
+              Choose Cohere and save a valid API key to enable AI answers from your Knowledge Base
+              and portfolio sections.
             </p>
           </label>
 
@@ -1097,16 +1264,16 @@ function ApiPanel({
             saved={Boolean(content.cohereApiKey?.trim())}
             placeholder="Paste Cohere API key"
           />
+        </section>
 
-          <SecretKeyField
-            label="gemini api key"
-            value={geminiApiKey}
-            onChange={setGeminiApiKey}
-            visible={showGemini}
-            onToggleVisible={() => setShowGemini(!showGemini)}
-            saved={Boolean(content.geminiApiKey?.trim())}
-            placeholder="Paste Gemini API key"
-          />
+        <section className="space-y-4 rounded-xl border border-border/60 bg-background/20 p-4">
+          <div>
+            <h3 className="text-sm font-semibold">RAG Indexing</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Re-index all portfolio content for semantic search. Runs automatically on save when Cohere key is set.
+            </p>
+          </div>
+          <RagIndexSection />
         </section>
       </div>
 
@@ -1115,7 +1282,6 @@ function ApiPanel({
           onSave({
             ...content,
             deepgramApiKey: deepgramApiKey.trim() || content.deepgramApiKey || "",
-            geminiApiKey: geminiApiKey.trim() || content.geminiApiKey || "",
             cohereApiKey: cohereApiKey.trim() || content.cohereApiKey || "",
             primaryModel,
             jarvisEnabled,

@@ -7,7 +7,7 @@ export type PortfolioContent = {
   experience: typeof EXPERIENCE;
   about: string;
   resumeUrl: string;
-  primaryModel?: "gemini" | "cohere" | "static";
+  primaryModel?: "cohere" | "static";
   jarvisEnabled?: boolean;
   deepgramSttModel?: string;
   deepgramTtsModel?: string;
@@ -32,7 +32,6 @@ export type JarvisReply = {
 export const JARVIS_KNOWLEDGE_BASE_MAX = 24_000;
 
 export type AdminContent = PortfolioContent & {
-  geminiApiKey?: string;
   cohereApiKey?: string;
   deepgramApiKey?: string;
   /** Personal facts, FAQs, hobbies, goals — injected into the LLM system prompt. */
@@ -40,3 +39,22 @@ export type AdminContent = PortfolioContent & {
 };
 
 export const PORTFOLIO_QUERY_KEY = ["portfolio", "content"] as const;
+
+export type RagIndexState = "idle" | "indexing" | "ready" | "failed" | "unconfigured";
+
+export type RagIndexPhase = "preparing" | "embedding" | "persisting";
+
+export type RagIndexStatus = {
+  state: RagIndexState;
+  chunkCount: number;
+  /** Total chunks in the current indexing run (progress denominator). */
+  totalChunks?: number;
+  /** Chunks embedded so far in the current run (progress numerator). */
+  processedChunks?: number;
+  /** Current pipeline step — shown while processedChunks is still 0. */
+  phase?: RagIndexPhase;
+  /** True when indexing was skipped because content fingerprint was unchanged. */
+  skipped?: boolean;
+  updatedAt: number;
+  error?: string;
+};

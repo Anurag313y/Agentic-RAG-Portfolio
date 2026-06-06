@@ -7,20 +7,27 @@ import {
   yearsAnswerIsGrounded,
 } from "./jarvis-facts.server";
 import { enrichLlmReply, staticJarvisAnswer } from "./jarvis-answer.server";
+import { sanitizeJarvisUserFacingText } from "./jarvis-speech";
+import { searchKnowledgeBaseAnswer } from "./jarvis-kb.server";
 import {
   detectJarvisFocus,
   focusRoutingInstruction,
+  isKnowledgeBaseQuestion,
   type JarvisFocus,
 } from "./jarvis-intent";
-import { resolveLlmKeys } from "./secrets.server";
+import { resolveCohereApiKey } from "./secrets.server";
+import { retrieveContext, hasIndexedChunks } from "./rag.server";
 
-/** Prefer Cohere/Gemini when API keys exist; avoids silent static mode in production. */
-async function resolveEffectiveModel(content: AdminContent): Promise<AdminContent["primaryModel"]> {
+/** Faster Cohere model — tuned for short voice replies with RAG context. */
+const COHERE_CHAT_MODEL = "command-r7b-12-2024";
+const COHERE_MAX_TOKENS = 200;
+
+/** Prefer Cohere when API key exists; avoids silent static mode in production. */
+async function resolveEffectiveModel(content: AdminContent): Promise<"cohere" | "static"> {
   const configured = content.primaryModel ?? "static";
-  if (configured !== "static") return configured;
-  const { cohereApiKey, geminiApiKey } = await resolveLlmKeys(content);
+  if (configured === "cohere") return "cohere";
+  const cohereApiKey = await resolveCohereApiKey(content);
   if (cohereApiKey) return "cohere";
-  if (geminiApiKey) return "gemini";
   return "static";
 }
 
@@ -68,7 +75,12 @@ Experience:
 ${expLines || "(none)"}`;
 }
 
-function buildFewShotExamples(ownerName: string): string {
+function buildFewShotExamples(ownerName: string, compact = false): string {
+  if (compact) {
+    return `EXAMPLES:
+User: "What are his skills?" → List concrete technologies briefly.
+User: "Where did he study?" → State school/college and level exactly from context.`;
+  }
   return `EXAMPLES (follow this style):
 User: "Tell me one of ${ownerName}'s projects"
 Assistant: "One of ${ownerName}'s projects is Sentinel — an observability platform for real-time logs and metrics."
@@ -91,7 +103,7 @@ function buildSystemPrompt(
     ? "Use only the facts in DERIVED FACTS, KNOWLEDGE BASE, and PORTFOLIO DATA below. Do not invent facts. If the answer is not there, say you do not have that information and suggest email contact."
     : "Use only the facts in DERIVED FACTS and PORTFOLIO DATA below. If unsure, suggest contacting via email.";
 
-  const voiceStyleRule = `Never mention where information came from (no "knowledge base", "portfolio data", "derived facts", "according to", "on this site", or similar). Never say you are scrolling, showing, opening sections, or navigating — give direct answers only.`;
+  const voiceStyleRule = `Never mention where information came from (no "knowledge base", "portfolio data", "derived facts", "according to", "on this site", or similar). Never say you are scrolling, showing, opening sections, or navigating — give direct answers only. Reply ONCE in 1-2 sentences: do NOT repeat the user's question, do NOT echo "Answer:" labels from context, and do NOT restate the same fact twice.`;
 
   const routing = focusRoutingInstruction(focus, content.profile.name);
   const careerYearsBlock = isCareerYearsQuestion(userMessage)
@@ -100,7 +112,7 @@ function buildSystemPrompt(
 
   return `You are JARVIS, the voice assistant on ${content.profile.name}'s portfolio website.
 Speak as a helpful AI assistant referring to the portfolio owner in third person (e.g. "${content.profile.name}'s project...").
-Keep answers SHORT for voice: 1-3 sentences unless the user asks for detail.
+Keep answers SHORT for voice: 1-2 sentences unless the user asks for detail.
 ${sourceRule}
 ${voiceStyleRule}
 
@@ -114,6 +126,74 @@ When the user wants the resume PDF, you may append [OPEN_RESUME] at the very end
 ${buildFewShotExamples(content.profile.name)}
 
 ${buildDerivedFactsSection(content, metrics)}${buildKnowledgeBaseSection(content)}${buildPortfolioContext(content)}`;
+}
+
+function buildRagSystemPrompt(
+  content: AdminContent,
+  focus: JarvisFocus,
+  metrics: ReturnType<typeof computeCareerMetrics>,
+  userMessage: string,
+  ragContext: string,
+): string {
+  const hasKb = Boolean(content.jarvisKnowledgeBase?.trim());
+  const sourceRule = hasKb
+    ? "Use only the facts in DERIVED FACTS and RETRIEVED CONTEXT below. Do not invent facts. If RETRIEVED CONTEXT contains the answer (especially knowledge_base entries), you MUST state it — never claim you lack information when the fact is present. Only if the fact is truly absent, say you do not have that information and suggest email contact."
+    : "Use only the facts in DERIVED FACTS and RETRIEVED CONTEXT below. If RETRIEVED CONTEXT contains the answer, state it directly. If unsure, suggest contacting via email.";
+
+  const voiceStyleRule = `Never mention where information came from (no "knowledge base", "portfolio data", "derived facts", "retrieved context", "according to", "on this site", or similar). Never say you are scrolling, showing, opening sections, or navigating — give direct answers only. Reply ONCE in 1-2 sentences: do NOT repeat the user's question, do NOT echo "Answer:" labels from context, and do NOT restate the same fact twice.`;
+
+  const routing = focusRoutingInstruction(focus, content.profile.name);
+  const careerYearsBlock = isCareerYearsQuestion(userMessage)
+    ? `\nMANDATORY FACT FOR THIS QUESTION: ${content.profile.name} has ${metrics.totalYears} years of professional experience. State this exact number.\n`
+    : "";
+
+  return `You are JARVIS, the voice assistant on ${content.profile.name}'s portfolio website.
+Speak as a helpful AI assistant referring to the portfolio owner in third person (e.g. "${content.profile.name}'s project...").
+Keep answers SHORT for voice: 1-2 sentences unless the user asks for detail.
+${sourceRule}
+${voiceStyleRule}
+
+CURRENT QUESTION ROUTING (mandatory):
+${routing}
+${careerYearsBlock}
+Do NOT confuse a project question with a bio/intro: if they ask about projects, name a project title — never reply with only headline or location.
+
+When the user wants the resume PDF, you may append [OPEN_RESUME] at the very end (it is stripped before display).
+
+${buildFewShotExamples(content.profile.name, true)}
+
+${buildDerivedFactsSection(content, metrics)}${ragContext}`;
+}
+
+function canAnswerWithoutLlm(trimmed: string, focus: JarvisFocus): boolean {
+  return (
+    focus === "contact" ||
+    focus === "resume" ||
+    focus === "terminal" ||
+    isCareerYearsQuestion(trimmed)
+  );
+}
+
+function tryInstantJarvisReply(
+  trimmed: string,
+  focus: JarvisFocus,
+  content: AdminContent,
+): JarvisReply | null {
+  if (canAnswerWithoutLlm(trimmed, focus)) {
+    if (isCareerYearsQuestion(trimmed)) {
+      return groundedCareerYearsReply(content);
+    }
+    return staticJarvisAnswer(trimmed, content);
+  }
+
+  if (focus === "education" || isKnowledgeBaseQuestion(trimmed)) {
+    const kbAnswer = searchKnowledgeBaseAnswer(trimmed, content.jarvisKnowledgeBase);
+    if (kbAnswer) {
+      return { text: sanitizeJarvisUserFacingText(kbAnswer) };
+    }
+  }
+
+  return null;
 }
 
 function replyMatchesFocus(focus: JarvisFocus, text: string, content: AdminContent): boolean {
@@ -135,48 +215,6 @@ function replyMatchesFocus(focus: JarvisFocus, text: string, content: AdminConte
   return true;
 }
 
-async function callGemini(
-  apiKey: string,
-  systemPrompt: string,
-  message: string,
-  history: JarvisChatMessage[],
-): Promise<string> {
-  const contents = [
-    ...history.map((h) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
-    })),
-    { role: "user", parts: [{ text: message }] },
-  ];
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents,
-      generationConfig: {
-        temperature: 0.25,
-        maxOutputTokens: 320,
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("[gemini] error:", res.status, body);
-    throw new Error("GEMINI_FAILED");
-  }
-
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error("GEMINI_EMPTY");
-  return text;
-}
-
 async function callCohere(
   apiKey: string,
   systemPrompt: string,
@@ -189,6 +227,7 @@ async function callCohere(
     content: h.content,
   }));
 
+  const start = Date.now();
   const res = await fetch("https://api.cohere.com/v2/chat", {
     method: "POST",
     headers: {
@@ -196,16 +235,18 @@ async function callCohere(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "command-r-plus-08-2024",
+      model: COHERE_CHAT_MODEL,
       messages: [
         { role: "system", content: systemPrompt },
         ...chatHistory,
         { role: "user", content: message },
       ],
-      max_tokens: 320,
+      max_tokens: COHERE_MAX_TOKENS,
       temperature,
     }),
   });
+
+  console.log(`[cohere] Chat API call took ${Date.now() - start}ms`);
 
   if (!res.ok) {
     const body = await res.text();
@@ -257,34 +298,52 @@ export async function generateJarvisReply(
   }
 
   const metrics = computeCareerMetrics(content);
-  const { geminiApiKey, cohereApiKey } = await resolveLlmKeys(content);
   const focus = detectJarvisFocus(trimmed);
-  const systemPrompt = buildSystemPrompt(content, focus, metrics, trimmed);
-  const cohereTemperature = isCareerYearsQuestion(trimmed) ? 0.05 : 0.15;
-
-  if (model === "gemini" && geminiApiKey) {
-    try {
-      const raw = await callGemini(geminiApiKey, systemPrompt, trimmed, history);
-      return finalizeLlmReply(raw, trimmed, focus, content, metrics);
-    } catch {
-      if (isCareerYearsQuestion(trimmed)) return groundedCareerYearsReply(content);
-      return staticJarvisAnswer(trimmed, content);
-    }
+  const instant = tryInstantJarvisReply(trimmed, focus, content);
+  if (instant) {
+    console.log(`[jarvis] Instant answer (focus=${focus}, no Cohere).`);
+    return instant;
   }
 
-  if (model === "cohere" && cohereApiKey) {
-    try {
-      const raw = await callCohere(
-        cohereApiKey,
-        systemPrompt,
-        trimmed,
-        history,
-        cohereTemperature,
-      );
-      return finalizeLlmReply(raw, trimmed, focus, content, metrics);
-    } catch {
-      if (isCareerYearsQuestion(trimmed)) return groundedCareerYearsReply(content);
-      return staticJarvisAnswer(trimmed, content);
+  const cohereTemperature = 0.12;
+
+  if (model === "cohere") {
+    const [cohereApiKey, chunksExist] = await Promise.all([
+      resolveCohereApiKey(content),
+      hasIndexedChunks(),
+    ]);
+
+    if (cohereApiKey) {
+      try {
+        let systemPrompt: string;
+
+        if (chunksExist) {
+          const ragContext = await retrieveContext(trimmed, cohereApiKey, focus, {
+            hasKnowledgeBase: Boolean(content.jarvisKnowledgeBase?.trim()),
+          });
+          if (ragContext) {
+            systemPrompt = buildRagSystemPrompt(content, focus, metrics, trimmed, ragContext);
+            console.log(`[rag] RAG prompt (focus=${focus}).`);
+          } else {
+            systemPrompt = buildSystemPrompt(content, focus, metrics, trimmed);
+          }
+        } else {
+          systemPrompt = buildSystemPrompt(content, focus, metrics, trimmed);
+          console.log("[rag] No indexed chunks — full-context prompt.");
+        }
+
+        const raw = await callCohere(
+          cohereApiKey,
+          systemPrompt,
+          trimmed,
+          history,
+          cohereTemperature,
+        );
+        return finalizeLlmReply(raw, trimmed, focus, content, metrics);
+      } catch {
+        if (isCareerYearsQuestion(trimmed)) return groundedCareerYearsReply(content);
+        return staticJarvisAnswer(trimmed, content);
+      }
     }
   }
 

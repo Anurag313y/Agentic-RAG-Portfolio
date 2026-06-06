@@ -17,7 +17,6 @@ export const DEFAULT_PORTFOLIO_CONTENT: PortfolioContent = {
 
 export const DEFAULT_ADMIN_CONTENT: AdminContent = {
   ...DEFAULT_PORTFOLIO_CONTENT,
-  geminiApiKey: "",
   cohereApiKey: "",
   deepgramApiKey: "",
   jarvisKnowledgeBase: "",
@@ -25,7 +24,6 @@ export const DEFAULT_ADMIN_CONTENT: AdminContent = {
 
 export function toPublicContent(content: AdminContent): PortfolioContent {
   const {
-    geminiApiKey: _g,
     cohereApiKey: _c,
     deepgramApiKey: _d,
     jarvisKnowledgeBase: _k,
@@ -34,7 +32,18 @@ export function toPublicContent(content: AdminContent): PortfolioContent {
   return publicContent;
 }
 
-
+/** Normalize legacy DB rows (e.g. deprecated gemini primaryModel / geminiApiKey). */
 export function mergeContent(raw: unknown): AdminContent {
-  return { ...DEFAULT_ADMIN_CONTENT, ...(raw as Partial<AdminContent>) };
+  const partial = (raw ?? {}) as Record<string, unknown>;
+  const { geminiApiKey: _legacyGemini, ...rest } = partial;
+
+  let primaryModel = rest.primaryModel as AdminContent["primaryModel"] | "gemini" | undefined;
+  if (primaryModel === "gemini") {
+    primaryModel = rest.cohereApiKey ? "cohere" : "static";
+  }
+  if (primaryModel !== "cohere" && primaryModel !== "static") {
+    primaryModel = "static";
+  }
+
+  return { ...DEFAULT_ADMIN_CONTENT, ...rest, primaryModel } as AdminContent;
 }

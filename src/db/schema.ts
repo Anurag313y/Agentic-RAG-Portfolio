@@ -29,3 +29,11 @@ export const contactMessages = sqliteTable("contact_messages", {
   message: text("message").notNull(),
   createdAt: integer("created_at").notNull(),
 });
+
+export const ragChunks = sqliteTable("rag_chunks", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  content: text("content").notNull(),
+  embedding: text("embedding").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
