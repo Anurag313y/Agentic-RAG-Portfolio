@@ -50,6 +50,13 @@ export function formatTerminalPrompt(handle: string, cwd: string): string {
   return `${handle}:${formatDisplayPath(cwd)}$`;
 }
 
+export function parsePromptParts(handle: string, cwd: string) {
+  return {
+    userHost: handle,
+    path: formatDisplayPath(cwd),
+  };
+}
+
 export function getWelcomeLines(content: PortfolioContent): string[] {
   return [
     `Hi, I'm ${content.profile.name}, a ${content.profile.role}.`,
@@ -57,6 +64,49 @@ export function getWelcomeLines(content: PortfolioContent): string[] {
     "Type 'help' or 'ls' to explore ~/portfolio",
     "Use 'xdg-open projects' to jump to a site section",
   ];
+}
+
+export function getLastLoginLine(): string {
+  const loginTime = new Date().toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  });
+
+  return `Last login: ${loginTime}`;
+}
+
+export function getMotdLines(content: PortfolioContent, lastLoginLine?: string): string[] {
+  const lines = [`Linux portfolio-shell 1.0 (${content.profile.handle})`];
+
+  if (lastLoginLine) {
+    lines.push(lastLoginLine);
+  }
+
+  lines.push(
+    "",
+    "Type 'help' or 'ls' to explore ~/portfolio",
+    "Use 'xdg-open projects' to jump to a site section",
+  );
+
+  return lines;
+}
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[—–]/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+}
+
+export function buildVirtualFsForCompletion(content: PortfolioContent): FsDir {
+  return buildVirtualFs(content);
 }
 
 export function applyTerminalSideEffects(effects: SideEffect[]): void {
@@ -67,15 +117,6 @@ export function applyTerminalSideEffects(effects: SideEffect[]): void {
       window.open(effect.url, "_blank", "noopener,noreferrer");
     }
   }
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[—–]/g, "-")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
 }
 
 function buildVirtualFs(content: PortfolioContent): FsDir {
