@@ -15,7 +15,16 @@ import {
 import { usePortfolio } from "@/context/portfolio";
 import { useJarvisVoice } from "@/hooks/use-jarvis-voice";
 import type { PortfolioContent } from "@/lib/content.types";
-import { resolveResumeUrl } from "@/lib/resume";
+import {
+  applyTerminalSideEffects,
+  createInitialShellState,
+  formatDisplayPath,
+  formatTerminalPrompt,
+  getWelcomeLines,
+  runShellCommand,
+  TERMINAL_QUICK_CMDS,
+} from "@/lib/terminal/terminal-shell";
+import type { ShellState } from "@/lib/terminal/terminal.types";
 
 type HeroMode = "jarvis" | "terminal";
 
@@ -456,74 +465,19 @@ export function Hero() {
    Inline Linux terminal for the hero-right (compact, premium)
    ============================================================ */
 
-const TERMINAL_HELP = [
-  "Available commands:",
-  "  whoami       — about Anurag",
-  "  skills       — list skills by category",
-  "  projects     — featured projects",
-  "  experience   — work history",
-  "  resume       — open resume",
-  "  contact      — contact details",
-  "  sudo hire-me — let's talk",
-  "  clear        — clear screen",
-];
-
-function runHeroCommand(cmd: string, content: PortfolioContent): string[] {
-  const { profile, projects, skills, experience, resumeUrl } = content;
-  const c = cmd.trim().toLowerCase();
-  if (!c) return [];
-  if (c === "help" || c === "?") return TERMINAL_HELP;
-  if (c === "whoami")
-    return [`${profile.name} — ${profile.role}`, profile.headline, `location: ${profile.location}`];
-  if (c === "skills")
-    return skills.flatMap((s) => [`▸ ${s.category}`, `   ${s.items.join(", ")}`]);
-  if (c === "projects") return projects.map((p) => `▸ ${p.title} — ${p.stack.join(" · ")}`);
-  if (c === "experience")
-    return experience.map((e) => `▸ ${e.role} @ ${e.company}  (${e.duration})`);
-  if (c === "resume") {
-    window.open(resolveResumeUrl(resumeUrl), "_blank", "noopener,noreferrer");
-    return ["opening resume.pdf in a new tab..."];
-  }
-  if (c === "contact")
-    return [
-      `email:    ${profile.email}`,
-      `github:   ${profile.socials.github}`,
-      `linkedin: ${profile.socials.linkedin}`,
-    ];
-  if (c === "sudo hire-me" || c === "hire-me")
-    return ["[sudo] authenticating recruiter...", "✓ access granted.", "redirecting to contact ↓"];
-  if (c === "clear") return ["__CLEAR__"];
-  if (c === "ls") return ["about  skills  projects  experience  resume  contact"];
-  if (c.startsWith("cd ")) {
-    const target = c.slice(3).trim();
-    const valid = ["about", "skills", "projects", "experience", "resume", "contact"];
-    if (valid.includes(target)) {
-      document.getElementById(target)?.scrollIntoView({ behavior: "smooth" });
-      return [`→ navigating to /${target}`];
-    }
-    return [`cd: no such section: ${target}`];
-  }
-  return [`command not found: ${cmd}. try 'help'`];
-}
-
-const QUICK_CMDS = ["whoami", "skills", "projects", "resume", "sudo hire-me"];
-
-type TLine = { type: "in" | "out" | "muted" | "heading" | "kv" | "hint"; text: string };
-
-function getWelcomeLines(content: PortfolioContent) {
-  return [
-    `Hi, I'm ${content.profile.name}, a ${content.profile.role}.`,
-    "Welcome to my interactive portfolio terminal.",
-    "Type 'help' or 'ls' for commands. Use 'cd <name>' to open sections (e.g. cd about, cd projects, cd contact).",
-  ];
-}
+type TLine = {
+  type: "in" | "out" | "muted" | "heading" | "kv" | "hint";
+  text: string;
+  prompt?: string;
+};
 
 function HeroTerminal({ content }: { content: PortfolioContent }) {
   const { profile } = content;
   const welcomeLines = getWelcomeLines(content);
-  const [lines, setLines] = useState<TLine[]>([{ type: "in", text: "cd welcome" }]);
+  const [shellState, setShellState] = useState<ShellState>(createInitialShellState);
+  const [lines, setLines] = useState<TLine[]>([]);
   const [input, setInput] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -537,24 +491,59 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
   };
 
   const submit = (cmd: string) => {
-    const out = runHeroCommand(cmd, content);
-    if (out[0] === "__CLEAR__") {
+    const trimmed = cmd.trim();
+    if (!trimmed) return;
+
+    const prompt = formatTerminalPrompt(profile.handle, shellState.cwd);
+    const { output, clear, state: nextState, effects } = runShellCommand(
+      trimmed,
+      shellState,
+      content,
+    );
+
+    setShellState(nextState);
+    setHistoryIndex(null);
+
+    if (clear) {
       setLines([]);
       scrollTerminalToBottom();
+      applyTerminalSideEffects(effects);
       return;
     }
-    setLines((l) => [
-      ...l,
-      { type: "in", text: cmd },
-      ...out.map((t) => ({ type: "out" as const, text: t })),
+
+    setLines((prev) => [
+      ...prev,
+      { type: "in", text: trimmed, prompt },
+      ...output.map((t) => ({ type: "out" as const, text: t })),
     ]);
     scrollTerminalToBottom();
-    if (cmd.trim().toLowerCase().startsWith("sudo hire-me")) {
-      setTimeout(() => {
-        document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
-      }, 600);
-    }
+    applyTerminalSideEffects(effects);
   };
+
+  const handleHistoryKey = (direction: "up" | "down") => {
+    const { history } = shellState;
+    if (history.length === 0) return;
+
+    if (direction === "up") {
+      const nextIndex =
+        historyIndex === null ? history.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(nextIndex);
+      setInput(history[nextIndex] ?? "");
+      return;
+    }
+
+    if (historyIndex === null) return;
+    const nextIndex = historyIndex + 1;
+    if (nextIndex >= history.length) {
+      setHistoryIndex(null);
+      setInput("");
+      return;
+    }
+    setHistoryIndex(nextIndex);
+    setInput(history[nextIndex] ?? "");
+  };
+
+  const currentPrompt = formatTerminalPrompt(profile.handle, shellState.cwd);
 
   return (
     <div
@@ -569,7 +558,7 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
           <span className="size-2 sm:size-2.5 rounded-full bg-emerald/80" />
         </div>
         <span className="font-mono text-[10px] sm:text-[11px] text-muted-foreground truncate min-w-0 flex-1 text-center px-1">
-          {profile.handle}: ~/portfolio
+          {profile.handle}: {formatDisplayPath(shellState.cwd)}
         </span>
         <span className="font-mono text-[9px] sm:text-[10px] text-emerald shrink-0">● live</span>
       </div>
@@ -583,8 +572,7 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
           if (l.type === "in") {
             return (
               <div key={i}>
-                <span className="text-emerald">{profile.handle}</span>
-                <span className="text-muted-foreground">:~$</span>{" "}
+                <span className="text-muted-foreground">{l.prompt ?? currentPrompt}</span>{" "}
                 <span className="text-foreground">{l.text}</span>
               </div>
             );
@@ -627,15 +615,18 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
           );
         })}
 
-        {lines.length <= 1 && (
+        {lines.length === 0 && (
           <>
-            <div className="text-foreground/85 whitespace-pre-wrap pl-1">
-              {welcomeLines[0]}
-            </div>
-            <div className="text-foreground/85 whitespace-pre-wrap pl-1">
-              {welcomeLines[1]}
-            </div>
-            <div className="pl-1 text-emerald/80 italic">{welcomeLines[2]}</div>
+            {welcomeLines.slice(0, 2).map((line) => (
+              <div key={line} className="text-foreground/85 whitespace-pre-wrap pl-1">
+                {line}
+              </div>
+            ))}
+            {welcomeLines.slice(2).map((line) => (
+              <div key={line} className="pl-1 text-emerald/80 italic">
+                {line}
+              </div>
+            ))}
           </>
         )}
 
@@ -645,26 +636,36 @@ function HeroTerminal({ content }: { content: PortfolioContent }) {
             submit(input);
             setInput("");
           }}
-          className="flex items-center gap-2 mt-1"
+          className="flex items-center gap-2 mt-1 min-w-0"
         >
-          <span className="text-emerald">{profile.handle}</span>
-          <span className="text-muted-foreground">:~$</span>
+          <span className="text-muted-foreground shrink-0">{currentPrompt}</span>
           <input
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setHistoryIndex(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                handleHistoryKey("up");
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                handleHistoryKey("down");
+              }
+            }}
             spellCheck={false}
             autoComplete="off"
             aria-label="terminal input"
             className="flex-1 bg-transparent outline-none text-foreground caret-cyan min-w-0"
           />
         </form>
-        <div ref={endRef} />
       </div>
 
       {/* Quick chips */}
       <div className="flex flex-wrap gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-cyan/15 bg-background/30 shrink-0">
-        {QUICK_CMDS.map((q) => (
+        {TERMINAL_QUICK_CMDS.map((q) => (
           <button
             key={q}
             onClick={() => submit(q)}

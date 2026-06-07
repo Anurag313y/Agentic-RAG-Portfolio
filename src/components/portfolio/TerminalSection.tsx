@@ -1,69 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 import { SectionHeading } from "./SectionHeading";
-import { PROFILE, SKILLS, PROJECTS, EXPERIENCE } from "@/lib/portfolio-data";
+import { EXPERIENCE, PROFILE, PROJECTS, SKILLS } from "@/lib/portfolio-data";
+import type { PortfolioContent } from "@/lib/content.types";
+import {
+  applyTerminalSideEffects,
+  createInitialShellState,
+  formatDisplayPath,
+  formatTerminalPrompt,
+  getWelcomeLines,
+  runShellCommand,
+  TERMINAL_QUICK_CMDS,
+} from "@/lib/terminal/terminal-shell";
+import type { ShellState } from "@/lib/terminal/terminal.types";
 
-type Line = { type: "in" | "out"; text: string };
+type Line = { type: "in" | "out"; text: string; prompt?: string };
 
-const HELP = [
-  "Available commands:",
-  "  whoami       — about Anurag",
-  "  skills       — list skills by category",
-  "  projects     — featured projects",
-  "  experience   — work history",
-  "  resume       — open resume",
-  "  contact      — contact details",
-  "  sudo hire-me — let's talk",
-  "  clear        — clear screen",
-];
-
-function runCommand(cmd: string): string[] {
-  const c = cmd.trim().toLowerCase();
-  if (!c) return [];
-  if (c === "help" || c === "?") return HELP;
-  if (c === "whoami")
-    return [
-      `${PROFILE.name} — ${PROFILE.role}`,
-      PROFILE.headline,
-      `location: ${PROFILE.location}`,
-    ];
-  if (c === "skills")
-    return SKILLS.flatMap((s) => [`▸ ${s.category}`, `   ${s.items.join(", ")}`]);
-  if (c === "projects")
-    return PROJECTS.map((p) => `▸ ${p.title} — ${p.stack.join(" · ")}`);
-  if (c === "experience")
-    return EXPERIENCE.map((e) => `▸ ${e.role} @ ${e.company}  (${e.duration})`);
-  if (c === "resume") {
-    window.open(PROFILE.resumeUrl, "_blank", "noopener,noreferrer");
-    return ["opening resume.pdf in a new tab..."];
-  }
-  if (c === "contact")
-    return [
-      `email:    ${PROFILE.email}`,
-      `github:   ${PROFILE.socials.github}`,
-      `linkedin: ${PROFILE.socials.linkedin}`,
-    ];
-  if (c === "sudo hire-me" || c === "hire-me")
-    return [
-      "[sudo] authenticating recruiter...",
-      "✓ access granted.",
-      "redirecting to contact section ↓",
-    ];
-  if (c === "clear") return ["__CLEAR__"];
-  if (c === "ls") return ["about  skills  projects  experience  resume  contact"];
-  return [`command not found: ${cmd}. try 'help'`];
-}
-
-const QUICK = ["whoami", "skills", "projects", "experience", "resume", "contact", "sudo hire-me"];
+const STATIC_CONTENT: PortfolioContent = {
+  profile: PROFILE,
+  skills: SKILLS,
+  projects: PROJECTS,
+  experience: EXPERIENCE,
+  about: PROFILE.intro,
+  resumeUrl: PROFILE.resumeUrl,
+};
 
 export function TerminalSection() {
-  const [lines, setLines] = useState<Line[]>([
-    { type: "out", text: `Welcome to ${PROFILE.handle} — type 'help' to begin.` },
-  ]);
+  const welcomeLines = getWelcomeLines(STATIC_CONTENT);
+  const [shellState, setShellState] = useState<ShellState>(createInitialShellState);
+  const [lines, setLines] = useState<Line[]>([]);
   const [input, setInput] = useState("");
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Scroll only the terminal container, not the page
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
@@ -71,22 +40,57 @@ export function TerminalSection() {
   }, [lines]);
 
   const submit = (cmd: string) => {
-    const out = runCommand(cmd);
-    if (out[0] === "__CLEAR__") {
+    const trimmed = cmd.trim();
+    if (!trimmed) return;
+
+    const prompt = formatTerminalPrompt(PROFILE.handle, shellState.cwd);
+    const { output, clear, state: nextState, effects } = runShellCommand(
+      trimmed,
+      shellState,
+      STATIC_CONTENT,
+    );
+
+    setShellState(nextState);
+    setHistoryIndex(null);
+
+    if (clear) {
       setLines([]);
+      applyTerminalSideEffects(effects);
       return;
     }
-    setLines((l) => [
-      ...l,
-      { type: "in", text: cmd },
-      ...out.map((t) => ({ type: "out" as const, text: t })),
+
+    setLines((prev) => [
+      ...prev,
+      { type: "in", text: trimmed, prompt },
+      ...output.map((t) => ({ type: "out" as const, text: t })),
     ]);
-    if (cmd.trim().toLowerCase().startsWith("sudo hire-me")) {
-      setTimeout(() => {
-        document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
-      }, 600);
-    }
+    applyTerminalSideEffects(effects);
   };
+
+  const handleHistoryKey = (direction: "up" | "down") => {
+    const { history } = shellState;
+    if (history.length === 0) return;
+
+    if (direction === "up") {
+      const nextIndex =
+        historyIndex === null ? history.length - 1 : Math.max(0, historyIndex - 1);
+      setHistoryIndex(nextIndex);
+      setInput(history[nextIndex] ?? "");
+      return;
+    }
+
+    if (historyIndex === null) return;
+    const nextIndex = historyIndex + 1;
+    if (nextIndex >= history.length) {
+      setHistoryIndex(null);
+      setInput("");
+      return;
+    }
+    setHistoryIndex(nextIndex);
+    setInput(history[nextIndex] ?? "");
+  };
+
+  const currentPrompt = formatTerminalPrompt(PROFILE.handle, shellState.cwd);
 
   return (
     <section id="terminal" className="py-12 sm:py-16 relative">
@@ -109,7 +113,7 @@ export function TerminalSection() {
               <span className="size-2.5 sm:size-3 rounded-full bg-emerald/80" />
             </div>
             <span className="font-mono text-[10px] sm:text-xs text-muted-foreground truncate min-w-0 flex-1 text-center">
-              {PROFILE.handle}: ~/portfolio
+              {PROFILE.handle}: {formatDisplayPath(shellState.cwd)}
             </span>
             <span className="font-mono text-[9px] sm:text-[10px] text-emerald shrink-0">● live</span>
           </div>
@@ -121,30 +125,58 @@ export function TerminalSection() {
             {lines.map((l, i) =>
               l.type === "in" ? (
                 <div key={i}>
-                  <span className="text-emerald">{PROFILE.handle}</span>
-                  <span className="text-muted-foreground">:~$</span>{" "}
+                  <span className="text-muted-foreground">{l.prompt ?? currentPrompt}</span>{" "}
                   <span className="text-foreground">{l.text}</span>
                 </div>
               ) : (
                 <div key={i} className="text-muted-foreground whitespace-pre-wrap pl-1">
                   {l.text}
                 </div>
-              )
+              ),
             )}
+
+            {lines.length === 0 && (
+              <>
+                {welcomeLines.map((line, i) => (
+                  <div
+                    key={line}
+                    className={
+                      i >= 2
+                        ? "pl-1 text-emerald/80 italic whitespace-pre-wrap"
+                        : "text-muted-foreground whitespace-pre-wrap pl-1"
+                    }
+                  >
+                    {line}
+                  </div>
+                ))}
+              </>
+            )}
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 submit(input);
                 setInput("");
               }}
-              className="flex items-center gap-2 mt-1"
+              className="flex items-center gap-2 mt-1 min-w-0"
             >
-              <span className="text-emerald">{PROFILE.handle}</span>
-              <span className="text-muted-foreground">:~$</span>
+              <span className="text-muted-foreground shrink-0">{currentPrompt}</span>
               <input
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  setHistoryIndex(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    handleHistoryKey("up");
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    handleHistoryKey("down");
+                  }
+                }}
                 spellCheck={false}
                 autoComplete="off"
                 aria-label="terminal input"
@@ -154,7 +186,7 @@ export function TerminalSection() {
           </div>
 
           <div className="flex flex-wrap gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-border/60">
-            {QUICK.map((q) => (
+            {TERMINAL_QUICK_CMDS.map((q) => (
               <button
                 key={q}
                 onClick={() => submit(q)}
