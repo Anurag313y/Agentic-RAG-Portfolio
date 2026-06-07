@@ -8,7 +8,12 @@ import {
   transcribeJarvisSpeech,
 } from "@/lib/api/jarvis.functions";
 import { applyJarvisActions } from "@/lib/jarvis-actions";
-import type { JarvisChatMessage } from "@/lib/content.types";
+import type { JarvisChatMessage, JarvisLanguage, JarvisSpeechAudio } from "@/lib/content.types";
+import {
+  detectJarvisLanguage,
+  needsBrowserTts,
+  ttsLanguage,
+} from "@/lib/jarvis-language";
 import {
   base64ToUint8Array,
   sanitizeJarvisUserFacingText,
@@ -25,24 +30,61 @@ const STATUS_META: Record<JarvisState, { label: string; dot: string }> = {
   responding: { label: "responding", dot: "bg-cyan-glow" },
 };
 
-function blobToBase64(blob: Blob): Promise<string> {
+/** Fade Q&A out this long after TTS finishes (or after text-only reply). */
+const CONVERSATION_CLEAR_DELAY_MS = 3000;
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function lastUserLanguage(history: JarvisChatMessage[]): JarvisLanguage | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i]?.role === "user") {
+      return detectJarvisLanguage(history[i]!.content);
+    }
+  }
+  return undefined;
+}
+
+let cachedHindiVoice: SpeechSynthesisVoice | null | undefined;
+
+function resolveHindiVoice(): SpeechSynthesisVoice | null {
+  if (cachedHindiVoice !== undefined) return cachedHindiVoice;
+  if (typeof window === "undefined" || !window.speechSynthesis) {
+    cachedHindiVoice = null;
+    return null;
+  }
+  const voices = window.speechSynthesis.getVoices();
+  cachedHindiVoice =
+    voices.find((v) => v.lang === "hi-IN") ??
+    voices.find((v) => v.lang.startsWith("hi")) ??
+    null;
+  return cachedHindiVoice;
+}
+
+function playBrowserSpeech(text: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (typeof result !== "string") {
-        reject(new Error("Failed to read audio"));
-        return;
-      }
-      const base64 = result.split(",")[1];
-      if (!base64) {
-        reject(new Error("Failed to encode audio"));
-        return;
-      }
-      resolve(base64);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read audio"));
-    reader.readAsDataURL(blob);
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      reject(new Error("Browser speech unavailable"));
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const voice = resolveHindiVoice();
+    if (voice) utter.voice = voice;
+    utter.lang = voice?.lang ?? "hi-IN";
+    utter.rate = 1.08;
+    utter.pitch = 1;
+    utter.onend = () => resolve();
+    utter.onerror = () => reject(new Error("Browser speech failed"));
+    window.speechSynthesis.speak(utter);
   });
 }
 
@@ -60,6 +102,23 @@ export function useJarvisVoice(resumeUrl: string) {
   const recordMimeRef = useRef("audio/webm");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const processingRef = useRef(false);
+  const conversationClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelConversationClear = useCallback(() => {
+    if (conversationClearTimerRef.current) {
+      clearTimeout(conversationClearTimerRef.current);
+      conversationClearTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleConversationClear = useCallback(() => {
+    cancelConversationClear();
+    conversationClearTimerRef.current = setTimeout(() => {
+      setTranscript("");
+      setResponse("");
+      conversationClearTimerRef.current = null;
+    }, CONVERSATION_CLEAR_DELAY_MS);
+  }, [cancelConversationClear]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,6 +140,14 @@ export function useJarvisVoice(resumeUrl: string) {
       void loadConfig();
     };
     window.addEventListener("focus", onFocus);
+
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        cachedHindiVoice = undefined;
+        resolveHindiVoice();
+      };
+    }
 
     return () => {
       cancelled = true;
@@ -105,103 +172,140 @@ export function useJarvisVoice(resumeUrl: string) {
   useEffect(() => {
     return () => {
       cleanupListen();
+      cancelConversationClear();
       audioRef.current?.pause();
       if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src);
     };
-  }, [cleanupListen]);
+  }, [cancelConversationClear, cleanupListen]);
 
-  const playOneSegment = useCallback((base64: string, mimeType: string) => {
-    return new Promise<void>((resolve, reject) => {
-      const bytes = base64ToUint8Array(base64);
-      const blob = new Blob([bytes as any], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audioRef.current = audio;
-
-      const finish = () => {
-        URL.revokeObjectURL(url);
-        if (audioRef.current === audio) audioRef.current = null;
-      };
-
-      audio.onended = () => {
-        finish();
-        resolve();
-      };
-      audio.onerror = () => {
-        finish();
-        reject(new Error("Audio playback failed"));
-      };
-      void audio.play().catch((err) => {
-        finish();
-        reject(err);
-      });
-    });
+  const stopCurrentAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (audioRef.current.src.startsWith("blob:")) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+      audioRef.current = null;
+    }
   }, []);
 
-  const playSpeech = useCallback(
-    async (fullText: string) => {
-      const parts = splitTextForTts(fullText);
-      if (parts.length === 0) {
-        setResponse("");
-        setState("ready");
-        return;
-      }
+  const playOneSegment = useCallback(
+    (base64: string, mimeType: string) => {
+      return new Promise<void>((resolve, reject) => {
+        const bytes = base64ToUint8Array(base64);
+        const blob = new Blob([bytes as BlobPart], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio();
+        audio.preload = "auto";
+        audioRef.current = audio;
 
-      if (!voiceOn) {
-        setResponse(fullText);
-        setTimeout(() => setState("ready"), 1800);
-        return;
-      }
+        const finish = () => {
+          URL.revokeObjectURL(url);
+          if (audioRef.current === audio) audioRef.current = null;
+        };
 
-      setState("responding");
-      setResponse(""); // clear previous response
+        let started = false;
+        const startPlayback = () => {
+          if (started) return;
+          started = true;
+          void audio.play().catch((err) => {
+            finish();
+            reject(err);
+          });
+        };
 
+        audio.onended = () => {
+          finish();
+          resolve();
+        };
+        audio.onerror = () => {
+          finish();
+          reject(new Error("Audio playback failed"));
+        };
+        audio.oncanplaythrough = startPlayback;
+        audio.src = url;
+        audio.load();
+      });
+    },
+    [],
+  );
+
+  const synthesizePartWithRetry = useCallback(async (part: string, language: JarvisLanguage) => {
+    const ttsText = textForJarvisSpeech(part);
+    if (!ttsText) return null;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          if (audioRef.current.src.startsWith("blob:")) {
-            URL.revokeObjectURL(audioRef.current.src);
-          }
-          audioRef.current = null;
+        return await synthesizeJarvisSpeech({ data: { text: ttsText, language } });
+      } catch (e) {
+        if (attempt === 1) {
+          console.error(`[jarvis] Failed synthesizing part after retry: "${part}"`, e);
         }
+      }
+    }
+    return null;
+  }, []);
 
-        // 1. Kick off all TTS synthesis calls in parallel to reduce API latency completely
-        const synthesisPromises = parts.map(async (part) => {
-          const ttsText = textForJarvisSpeech(part);
-          if (!ttsText) return null;
-          try {
-            const result = await synthesizeJarvisSpeech({ data: { text: ttsText } });
-            return { part, result };
-          } catch (e) {
-            console.error(`[jarvis] Failed synthesizing part: "${part}"`, e);
-            return { part, result: null };
-          }
-        });
+  const playSpeechSegments = useCallback(
+    async (fullText: string, language: JarvisLanguage, prefetched: JarvisSpeechAudio[]) => {
+      stopCurrentAudio();
 
-        // 2. Play sequentially while revealing the corresponding text block
-        for (let i = 0; i < parts.length; i++) {
-          const synth = await synthesisPromises[i];
-          const partText = synth ? synth.part : parts[i];
-          
-          // Append this sentence to the visible response right before we play its audio
-          setResponse((prev) => (prev ? prev + " " + partText : partText));
+      const speechText = textForJarvisSpeech(fullText);
+      if (needsBrowserTts(speechText)) {
+        await playBrowserSpeech(speechText);
+        return;
+      }
 
-          if (synth && synth.result) {
-            const { base64, mimeType } = synth.result;
-            await playOneSegment(base64, mimeType);
-          }
+      if (prefetched.length > 0) {
+        for (const segment of prefetched) {
+          await playOneSegment(segment.base64, segment.mimeType);
         }
-        setState("ready");
-      } catch (error) {
-        console.error("[jarvis] TTS failed:", error);
-        // Fallback: show the entire text
-        setResponse(fullText);
-        toast.error(error instanceof Error ? error.message : "Voice playback failed");
-        setState("ready");
+        return;
+      }
+
+      const parts = splitTextForTts(speechText);
+      if (parts.length === 0) return;
+
+      const lang = ttsLanguage(language);
+      const synthPromises = parts.map((part) => synthesizePartWithRetry(part, lang));
+      for (const promise of synthPromises) {
+        const audio = await promise;
+        if (audio) {
+          await playOneSegment(audio.base64, audio.mimeType);
+        }
       }
     },
-    [playOneSegment, voiceOn],
+    [playOneSegment, stopCurrentAudio, synthesizePartWithRetry],
+  );
+
+  const deliverReply = useCallback(
+    async (
+      userText: string,
+      displayText: string,
+      lang: JarvisLanguage,
+      speechSegments: JarvisSpeechAudio[],
+      actions?: Parameters<typeof applyJarvisActions>[0],
+    ) => {
+      setResponse(displayText);
+      setState("responding");
+      applyJarvisActions(actions, resumeUrl);
+
+      if (!voiceOn) {
+        setState("ready");
+        scheduleConversationClear();
+        return;
+      }
+
+      try {
+        await playSpeechSegments(displayText, lang, speechSegments);
+      } catch (error) {
+        console.error("[jarvis] TTS failed:", error);
+        toast.error(error instanceof Error ? error.message : "Voice playback failed");
+      } finally {
+        setState("ready");
+        scheduleConversationClear();
+      }
+    },
+    [playSpeechSegments, resumeUrl, scheduleConversationClear, voiceOn],
   );
 
   const runQuery = useCallback(
@@ -210,29 +314,30 @@ export function useJarvisVoice(resumeUrl: string) {
       if (!trimmed || processingRef.current) return;
 
       processingRef.current = true;
+      cancelConversationClear();
       setState("processing");
       setTranscript(trimmed);
+      setResponse("");
 
       try {
-        const reply = await askJarvisAssistant({
+        const result = await askJarvisAssistant({
           data: {
             message: trimmed,
             history: historyRef.current,
+            includeSpeech: voiceOn,
           },
         });
 
-        const displayText = sanitizeJarvisUserFacingText(reply.text);
+        const displayText = sanitizeJarvisUserFacingText(result.text);
+        const lang = result.language ?? detectJarvisLanguage(trimmed);
 
         historyRef.current = [
-          ...historyRef.current.slice(-10),
+          ...historyRef.current.slice(-4),
           { role: "user", content: trimmed },
           { role: "assistant", content: displayText },
         ];
-        
-        // Remove direct setResponse(displayText) here. Instead, let playSpeech
-        // stream/append it in sync with audio or set it directly if voiceOn is off.
-        applyJarvisActions(reply.actions, resumeUrl);
-        await playSpeech(displayText);
+
+        await deliverReply(trimmed, displayText, lang, result.speechSegments, result.actions);
       } catch (error) {
         console.error("[jarvis] ask failed:", error);
         toast.error(error instanceof Error ? error.message : "JARVIS could not respond");
@@ -241,33 +346,68 @@ export function useJarvisVoice(resumeUrl: string) {
         processingRef.current = false;
       }
     },
-    [playSpeech, resumeUrl],
+    [cancelConversationClear, deliverReply, voiceOn],
   );
 
-  const transcribeRecording = useCallback(async () => {
+  const processRecording = useCallback(async () => {
     const chunks = audioChunksRef.current;
     if (chunks.length === 0) {
       throw new Error("EMPTY_AUDIO");
     }
+
     const blob = new Blob(chunks, { type: recordMimeRef.current });
+    if (blob.size < 512) {
+      throw new Error("No audio recorded. Hold the mic a bit longer and try again.");
+    }
     const audioBase64 = await blobToBase64(blob);
     const mimeType = recordMimeRef.current.split(";")[0]?.trim() || "audio/webm";
+    const languageHint = lastUserLanguage(historyRef.current);
+
     const { transcript: text } = await transcribeJarvisSpeech({
-      data: { audioBase64, mimeType },
+      data: { audioBase64, mimeType, languageHint },
     });
+
+    setTranscript(text);
+    setResponse("");
+
+    const result = await askJarvisAssistant({
+      data: {
+        message: text,
+        history: historyRef.current,
+        includeSpeech: voiceOn,
+      },
+    });
+
+    const displayText = sanitizeJarvisUserFacingText(result.text);
+    const lang = result.language ?? detectJarvisLanguage(text);
+
+    historyRef.current = [
+      ...historyRef.current.slice(-4),
+      { role: "user", content: text },
+      { role: "assistant", content: displayText },
+    ];
+
+    await deliverReply(text, displayText, lang, result.speechSegments, result.actions);
     return text;
-  }, []);
+  }, [deliverReply, voiceOn]);
 
   const startListening = useCallback(async () => {
     if (!supported || processingRef.current) return;
 
+    cancelConversationClear();
     setTranscript("");
     setResponse("");
     setState("listening");
     audioChunksRef.current = [];
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       mediaStreamRef.current = stream;
 
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -275,7 +415,10 @@ export function useJarvisVoice(resumeUrl: string) {
         : "audio/webm";
       recordMimeRef.current = mimeType;
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = new MediaRecorder(stream, {
+        mimeType,
+        audioBitsPerSecond: 64000,
+      });
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -290,14 +433,14 @@ export function useJarvisVoice(resumeUrl: string) {
         setState("ready");
       };
 
-      recorder.start(250);
+      recorder.start(100);
     } catch (error) {
       console.error("[jarvis] listen failed:", error);
       toast.error(error instanceof Error ? error.message : "Could not start listening");
       cleanupListen();
       setState("ready");
     }
-  }, [cleanupListen, supported]);
+  }, [cancelConversationClear, cleanupListen, supported]);
 
   const stopListening = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -312,33 +455,36 @@ export function useJarvisVoice(resumeUrl: string) {
     recorder.onstop = () => {
       void (async () => {
         try {
-          setTranscript("Transcribing audio..."); // Immediate UI feedback that speaking finished
-          const text = await transcribeRecording();
-          setTranscript(text);
+          await processRecording();
           cleanupListen();
-          await runQuery(text);
         } catch (error) {
-          console.error("[jarvis] transcribe failed:", error);
+          console.error("[jarvis] voice turn failed:", error);
           toast.error(error instanceof Error ? error.message : "Could not understand audio");
           cleanupListen();
           setState("ready");
+        } finally {
+          processingRef.current = false;
         }
       })();
     };
 
+    processingRef.current = true;
+
     try {
       recorder.stop();
     } catch {
+      processingRef.current = false;
       cleanupListen();
       setState("ready");
     }
-  }, [cleanupListen, runQuery, transcribeRecording]);
+  }, [cleanupListen, processRecording]);
 
   const cancelVoice = useCallback(() => {
-    audioRef.current?.pause();
-    if (audioRef.current?.src) URL.revokeObjectURL(audioRef.current.src);
-    audioRef.current = null;
-  }, []);
+    stopCurrentAudio();
+    if (typeof window !== "undefined") {
+      window.speechSynthesis?.cancel();
+    }
+  }, [stopCurrentAudio]);
 
   const statusMeta = useMemo(() => STATUS_META[state], [state]);
 

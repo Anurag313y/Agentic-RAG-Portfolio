@@ -644,6 +644,36 @@ export function hybridSearch(
   return rankChunksByRelevance(merged, queryEmbedding, query, focus).slice(0, maxTotal);
 }
 
+/** Keyword-only retrieval for projects/skills/about/etc. — avoids embed API latency. */
+function retrieveFocusContextFast(
+  query: string,
+  allChunks: RagChunkWithEmbedding[],
+  focus: JarvisFocus,
+): string | null {
+  const prioritySources = FOCUS_SOURCE_PRIORITY[focus];
+  const pool = prioritySources?.length
+    ? allChunks.filter((c) => prioritySources.includes(c.source))
+    : allChunks;
+
+  const hits = keywordSearchWithScores(query, pool, 6);
+  if (hits.length === 0 && prioritySources?.length) {
+    const fallback = allChunks.filter((c) => prioritySources.includes(c.source)).slice(0, 3);
+    if (fallback.length > 0) {
+      return formatRetrievedContext(fallback);
+    }
+    return null;
+  }
+
+  const topChunks = rankChunksByRelevance(
+    hits.map((h) => h.chunk),
+    null,
+    query,
+    focus,
+  ).slice(0, MAX_CONTEXT_CHUNKS);
+
+  return topChunks.length > 0 ? formatRetrievedContext(topChunks) : null;
+}
+
 // ---------------------------------------------------------------------------
 // 4. Index Content — chunk → embed → batch upsert D1
 // ---------------------------------------------------------------------------
@@ -882,6 +912,16 @@ export async function retrieveContext(
   if (allChunks.length === 0) return null;
 
   const kbQuestion = hasKnowledgeBase && (isKnowledgeBaseQuestion(query) || focus === "education");
+
+  // Structured portfolio questions — keyword + focus retrieval, skip Cohere embed (~300–800ms saved)
+  if (!kbQuestion && focus !== "general") {
+    const focusFast = retrieveFocusContextFast(query, allChunks, focus);
+    if (focusFast) {
+      console.log(`[rag] Focus fast-path (${focus}, skipped embed) in ${Date.now() - startQueryTime}ms`);
+      return focusFast;
+    }
+  }
+
   if (kbQuestion) {
     const keywordHits = keywordSearchWithScores(query, allChunks, 8);
     const topHit = keywordHits[0];
