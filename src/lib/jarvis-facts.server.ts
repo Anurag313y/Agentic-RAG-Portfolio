@@ -1,4 +1,5 @@
 import type { AdminContent } from "./content.types";
+import { useHinglishReply, type JarvisLanguage } from "./jarvis-language";
 
 export type CareerRoleSpan = {
   company: string;
@@ -159,14 +160,16 @@ export function buildDerivedFactsSection(
 }
 
 const CAREER_YEARS_QUESTION_RE =
-  /\b(how many|how much|total|overall)\b.{0,40}\b(years?|yrs?)\b.{0,40}\b(experience|exp)\b|\b(years?|yrs?)\b.{0,30}\b(of\s+)?(professional\s+)?experience\b|\bexperience\b.{0,25}\b(years?|yrs?)\b|\bhow long\b.{0,30}\b(worked|working|been)\b/i;
+  /\b(how many|how much|total|overall)\b.{0,40}\b(years?|yrs?)\b.{0,40}\b(experience|exp)\b|\b(years?|yrs?)\b.{0,30}\b(of\s+)?(professional\s+)?experience\b|\bexperience\b.{0,25}\b(years?|yrs?)\b|\bhow long\b.{0,30}\b(worked|working|been)\b|\b(kitne|kitna)\b.{0,20}\b(saal|sal|years?)\b|\b(saal|sal)\b.{0,20}\b(ka|ke)?\b.{0,15}\b(experience|exp|kaam)\b|\bexperience\b.{0,15}\b(kitna|kitne)\b/i;
 
 export function isCareerYearsQuestion(question: string): boolean {
   return CAREER_YEARS_QUESTION_RE.test(question.trim());
 }
 
 export function extractYearsMentioned(text: string): number | null {
-  const m = text.match(/\b(\d+(?:\.\d+)?)\s*\+?\s*years?\b/i);
+  const m =
+    text.match(/\b(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?|saal|sal)\b/i) ??
+    text.match(/\b(\d+(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b/i);
   if (!m?.[1]) return null;
   const n = Number.parseFloat(m[1]);
   return Number.isFinite(n) ? n : null;
@@ -187,24 +190,34 @@ export function yearsAnswerIsGrounded(
 export function buildCareerYearsReply(
   content: AdminContent,
   metrics: CareerMetrics,
+  lang: JarvisLanguage = "en",
 ): string {
   const name = content.profile.name;
   const years = formatYearsForSpeech(metrics.totalYears);
+  const hinglish = useHinglishReply(lang);
 
   if (metrics.totalYears <= 0) {
-    return `I don't have enough work-history detail to calculate ${name}'s total years of experience. You can check the experience section or email ${content.profile.email}.`;
+    return hinglish
+      ? `${name} ke total experience ka exact data mere paas nahi hai. Experience section dekho ya email karo ${content.profile.email} par.`
+      : `I don't have enough work-history detail to calculate ${name}'s total years of experience. You can check the experience section or email ${content.profile.email}.`;
   }
 
   if (metrics.roles.length > 0) {
     const earliest = metrics.roles[0];
     const latest = metrics.roles[metrics.roles.length - 1];
     if (metrics.roles.length === 1 && earliest) {
-      return `${name} has ${years} years of professional experience, including ${earliest.role} at ${earliest.company}.`;
+      return hinglish
+        ? `${name} ke paas ${years} saal ka professional experience hai, including ${earliest.role} at ${earliest.company}.`
+        : `${name} has ${years} years of professional experience, including ${earliest.role} at ${earliest.company}.`;
     }
     if (earliest && latest) {
-      return `${name} has ${years} years of professional experience, from ${earliest.role} at ${earliest.company} through ${latest.role} at ${latest.company}.`;
+      return hinglish
+        ? `${name} ke paas ${years} saal ka professional experience hai — ${earliest.role} at ${earliest.company} se ${latest.role} at ${latest.company} tak.`
+        : `${name} has ${years} years of professional experience, from ${earliest.role} at ${earliest.company} through ${latest.role} at ${latest.company}.`;
     }
   }
 
-  return `${name} has ${years} years of professional experience.`;
+  return hinglish
+    ? `${name} ke paas ${years} saal ka professional experience hai.`
+    : `${name} has ${years} years of professional experience.`;
 }

@@ -1,4 +1,4 @@
-import type { AdminContent, JarvisAction, JarvisReply } from "./content.types";
+import type { AdminContent, JarvisAction, JarvisLanguage, JarvisReply } from "./content.types";
 import {
   buildCareerYearsReply,
   computeCareerMetrics,
@@ -7,11 +7,25 @@ import {
 import { detectJarvisFocus } from "./jarvis-intent";
 import { sanitizeJarvisUserFacingText } from "./jarvis-speech";
 
-export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisReply {
+function useHinglish(lang?: JarvisLanguage): boolean {
+  return lang === "hi" || lang === "hinglish";
+}
+
+export function staticJarvisAnswer(
+  raw: string,
+  content: AdminContent,
+  lang: JarvisLanguage = "en",
+): JarvisReply {
   const { profile, projects, skills, experience, resumeUrl } = content;
   const q = raw.toLowerCase().trim();
+  const hinglish = useHinglish(lang);
+
   if (!q) {
-    return { text: "I didn't catch that. Try asking about projects, skills, or contact." };
+    return {
+      text: hinglish
+        ? "Samajh nahi aaya. Projects, skills ya contact ke baare mein pooch sakte ho."
+        : "I didn't catch that. Try asking about projects, skills, or contact.",
+    };
   }
 
   const focus = detectJarvisFocus(q);
@@ -21,13 +35,17 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
     const pick = visible[0];
     if (!pick) {
       return {
-        text: `I don't have project details listed yet. You can reach ${profile.name} at ${profile.email}.`,
+        text: hinglish
+          ? `Abhi project details nahi hain. ${profile.name} ko ${profile.email} par reach kar sakte ho.`
+          : `I don't have project details listed yet. You can reach ${profile.name} at ${profile.email}.`,
       };
     }
-    const wantsOne = /\b(one|a |single|any|example)\b/.test(q);
+    const wantsOne = /\b(one|a |single|any|example|ek|koi)\b/.test(q);
     if (wantsOne) {
       return {
-        text: `One of ${profile.name}'s projects is ${pick.title}: ${pick.description}`,
+        text: hinglish
+          ? `Unka ek project ${pick.title} hai — ${pick.description}`
+          : `One of ${profile.name}'s projects is ${pick.title}: ${pick.description}`,
       };
     }
     const top = visible
@@ -35,13 +53,17 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       .map((p) => p.title)
       .join(", ");
     return {
-      text: `His top projects include ${top}.`,
+      text: hinglish
+        ? `Unke top projects mein ${top} shamil hain.`
+        : `His top projects include ${top}.`,
     };
   }
 
   if (focus === "about") {
     return {
-      text: `${profile.name} is a ${profile.role}. ${profile.headline} Based in ${profile.location}.`,
+      text: hinglish
+        ? `${profile.name} ek ${profile.role} hain — ${profile.headline}. ${profile.location} mein based hain.`
+        : `${profile.name} is a ${profile.role}. ${profile.headline} Based in ${profile.location}.`,
     };
   }
 
@@ -51,19 +73,23 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
       .slice(0, 8)
       .join(", ");
     return {
-      text: `Strongest skills: ${flat}, and more.`,
+      text: hinglish
+        ? `Unki strong skills mein ${flat} shamil hain, aur bhi kaafi kuch.`
+        : `Strongest skills: ${flat}, and more.`,
     };
   }
 
   if (focus === "contact") {
     return {
-      text: `Easiest path: email ${profile.email}.`,
+      text: hinglish
+        ? `Sabse aasaan tareeka — email karo ${profile.email} par.`
+        : `Easiest path: email ${profile.email}.`,
     };
   }
 
   if (focus === "resume") {
     return {
-      text: "Opening the resume in a new tab.",
+      text: hinglish ? "Resume nayi tab mein khol raha hoon." : "Opening the resume in a new tab.",
       actions: { openResume: true },
     };
   }
@@ -72,27 +98,35 @@ export function staticJarvisAnswer(raw: string, content: AdminContent): JarvisRe
     if (isCareerYearsQuestion(q)) {
       const metrics = computeCareerMetrics(content);
       return {
-        text: buildCareerYearsReply(content, metrics),
+        text: buildCareerYearsReply(content, metrics, lang),
       };
     }
     const latest = experience[0];
     const summary = latest
       ? `${latest.role} at ${latest.company} (${latest.duration})`
-      : "his roles on the site";
+      : hinglish
+        ? "site par unke roles"
+        : "his roles on the site";
     return {
-      text: `His latest role is ${summary}.`,
+      text: hinglish
+        ? `Unka latest role ${summary} hai.`
+        : `His latest role is ${summary}.`,
     };
   }
 
   if (focus === "terminal") {
     return {
-      text: "You can use the terminal mode in the hero section for interactive commands.",
+      text: hinglish
+        ? "Hero section mein terminal mode switch karke interactive commands use kar sakte ho."
+        : "You can use the terminal mode in the hero section for interactive commands.",
     };
   }
 
   void resumeUrl;
   return {
-    text: 'Try: "show projects", "what are his skills", "contact info", or "open resume".',
+    text: hinglish
+      ? 'Try karo: "project batao", "skills kya hain", "contact", ya "resume kholo".'
+      : 'Try: "show projects", "what are his skills", "contact info", or "open resume".',
   };
 }
 

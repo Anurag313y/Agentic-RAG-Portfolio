@@ -35,9 +35,11 @@ export function stripRepeatedQaEcho(text: string): string {
     .trim();
 }
 
+const SENTENCE_SPLIT = /[^.!?।]+[.!?।]+|[^.!?।]+$/g;
+
 /** Remove duplicate sentences (model sometimes restates the same fact). */
 export function dedupeSentences(text: string): string {
-  const parts = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [text];
+  const parts = text.match(SENTENCE_SPLIT) ?? [text];
   const seen = new Set<string>();
   const out: string[] = [];
 
@@ -109,7 +111,7 @@ export function splitTextForTts(text: string, maxLen = TTS_CHUNK_MAX): string[] 
   if (!trimmed) return [];
   if (trimmed.length <= maxLen) return [trimmed];
 
-  const sentences = trimmed.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [trimmed];
+  const sentences = trimmed.match(SENTENCE_SPLIT) ?? [trimmed];
   const chunks: string[] = [];
   let current = "";
 

@@ -12,7 +12,6 @@ import {
   triggerReindexRagBackground,
   fetchRagIndexStatus,
 } from "../content.server";
-
 const adminContentSchema = z.object({
   profile: z.record(z.unknown()),
   skills: z.array(z.object({ category: z.string(), items: z.array(z.string()) })),
@@ -78,3 +77,4 @@ export const getRagIndexStatus = createServerFn({ method: "GET" }).handler(async
   await requireAdminSession();
   return fetchRagIndexStatus();
 });
+

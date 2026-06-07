@@ -23,9 +23,29 @@ export type JarvisChatMessage = {
   content: string;
 };
 
+export type JarvisLanguage = "en" | "hi" | "hinglish";
+
 export type JarvisReply = {
   text: string;
   actions?: JarvisAction;
+  /** Detected user language — used for TTS routing. */
+  language?: JarvisLanguage;
+};
+
+/** Pre-synthesized Deepgram audio — avoids a second client round-trip for voice. */
+export type JarvisSpeechAudio = {
+  base64: string;
+  mimeType: string;
+};
+
+export type JarvisVoiceTurnResult = {
+  transcript: string;
+  reply: JarvisReply;
+  speechSegments: JarvisSpeechAudio[];
+};
+
+export type JarvisAskResult = JarvisReply & {
+  speechSegments: JarvisSpeechAudio[];
 };
 
 /** Free-form facts for JARVIS / Cohere — admin-only, not exposed on the public site. */

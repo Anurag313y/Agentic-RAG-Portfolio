@@ -357,53 +357,62 @@ export function Hero() {
 
                   {/* Transcript / response — borderless, just a soft surface */}
                   <div className="mt-1.5 sm:mt-2 lg:mt-1.5 font-mono text-xs sm:text-sm min-h-[48px] sm:min-h-[52px] lg:min-h-[44px] px-1 break-words">
-                    <AnimatePresence mode="wait">
-                      {transcript && (
+                    <AnimatePresence initial={false}>
+                      {transcript ? (
                         <motion.div
                           key={"t-" + transcript}
-                          initial={{ opacity: 0, y: 4 }}
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.35, ease: "easeOut" }}
                           className="text-foreground/80"
                         >
                           <span className="text-cyan">you ›</span> {transcript}
                         </motion.div>
-                      )}
+                      ) : null}
                     </AnimatePresence>
-                    <AnimatePresence mode="wait">
-                      {state === "processing" && (
+                    <AnimatePresence initial={false}>
+                      {state === "processing" ? (
                         <motion.div
                           key="proc"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25 }}
                           className="mt-2 text-muted-foreground"
                         >
                           <Sparkles className="inline size-3.5 mr-1 text-cyan" />
                           thinking<span className="caret">▍</span>
                         </motion.div>
-                      )}
-                      {response && state !== "processing" && (
+                      ) : null}
+                      {response && state !== "listening" ? (
                         <motion.div
                           key={"r-" + response}
-                          initial={{ opacity: 0, y: 4 }}
+                          initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.35, ease: "easeOut" }}
                           className="mt-2 text-foreground/95"
                         >
                           <span className="text-emerald">jarvis ›</span> {response}
                         </motion.div>
-                      )}
-                      {!transcript && !response && (
+                      ) : null}
+                    </AnimatePresence>
+                    <AnimatePresence initial={false}>
+                      {!transcript && !response && state === "ready" ? (
                         <motion.div
                           key="hint"
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.3 }}
                           className="text-muted-foreground text-[11px] sm:text-xs leading-snug text-center"
                         >
                           {supported
                             ? "Tap the mic and ask anything — projects, skills, contact. Or pick a suggestion below."
                             : "Voice unavailable (mic permission or server voice config). Use the suggestions below to query JARVIS."}
                         </motion.div>
-                      )}
+                      ) : null}
                     </AnimatePresence>
                   </div>
 

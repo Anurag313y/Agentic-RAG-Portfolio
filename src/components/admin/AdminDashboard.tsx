@@ -1177,8 +1177,35 @@ function ApiPanel({
         <KeyStatus configured={cohereConfigured} label="Cohere" />
       </div>
 
-      <div className="mb-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed">
-        Save keys here to enable JARVIS voice and AI replies without redeploying. For security, SMTP settings (like your App Password) must be configured in <span className="font-mono text-cyan">.dev.vars</span> via <span className="font-mono text-cyan">SMTP_PASS</span> (locally) or as a secure secret (in production).
+      <div className="mb-5 rounded-lg border border-border/60 bg-background/30 px-3 py-2.5 text-xs text-muted-foreground leading-relaxed space-y-2">
+        <p>
+          Save keys here to enable JARVIS voice and AI replies without redeploying. For security,
+          SMTP settings must live in <span className="font-mono text-cyan">.dev.vars</span> (
+          <span className="font-mono text-cyan">SMTP_PASS</span>) locally or as a production secret.
+        </p>
+        <p>
+          <span className="text-foreground/80 font-medium">Usage &amp; billing:</span> enable low-balance
+          alerts in{" "}
+          <a
+            href="https://console.deepgram.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan hover:underline"
+          >
+            Deepgram Console
+          </a>{" "}
+          and{" "}
+          <a
+            href="https://dashboard.cohere.com/billing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan hover:underline"
+          >
+            Cohere Billing
+          </a>
+          . When credits run out, JARVIS shows a clear on-site error (invalid key, rate limit, or voice
+          failure) — check browser toasts and Cloudflare Worker logs.
+        </p>
       </div>
 
       <div className="space-y-6">

@@ -10,16 +10,18 @@ export type JarvisFocus =
   | "terminal"
   | "general";
 
+import { normalizeQueryForIntent } from "./jarvis-language";
+
 /** Personal / FAQ questions that should prioritize Knowledge Base chunks in RAG. */
 export function isKnowledgeBaseQuestion(question: string): boolean {
-  const q = question.toLowerCase();
-  return /\b(education|school|college|university|degree|secondary|higher secondary|higher-secondary|12th|10th|intermediate|graduate|postgraduate|mba|b\.?tech|m\.?tech|studied|study|certification|certified|hobby|hobbies|language|fluent|born|childhood|hometown|native|open to work|availability|relocate|salary|expected|interview|fun fact|matriculation|ssc|hsc|cbse|icse|where did|where has|where was)\b/.test(
+  const q = normalizeQueryForIntent(question);
+  return /\b(education|school|college|university|degree|secondary|higher secondary|higher-secondary|12th|10th|intermediate|graduate|postgraduate|mba|b\.?tech|m\.?tech|studied|study|certification|certified|hobby|hobbies|language|fluent|born|childhood|hometown|native|open to work|availability|relocate|salary|expected|interview|fun fact|matriculation|ssc|hsc|cbse|icse|where did|where has|where was|padhai|padhaai)\b/.test(
     q,
   );
 }
 
 export function detectJarvisFocus(question: string): JarvisFocus {
-  const q = question.toLowerCase();
+  const q = normalizeQueryForIntent(question);
 
   // Education / schooling — before experience (some users say "education history")
   if (
@@ -31,10 +33,10 @@ export function detectJarvisFocus(question: string): JarvisFocus {
   }
 
   // Specific topics first (avoid "tell me" matching generic about)
-  if (/\b(project|projects|portfolio|built|builds?|github repo|repos)\b/.test(q)) {
+  if (/\b(project|projects|portfolio|built|builds?|github repo|repos|pariyojana|projet)\b/.test(q)) {
     return "projects";
   }
-  if (/\b(skill|skills|stack|tech stack|technolog|framework|language)\b/.test(q)) {
+  if (/\b(skill|skills|stack|tech stack|technolog|framework|kaushal)\b/.test(q)) {
     return "skills";
   }
   if (
@@ -50,17 +52,17 @@ export function detectJarvisFocus(question: string): JarvisFocus {
   if (/\b(experience|work history|job history|company|companies|employer|worked at)\b/.test(q)) {
     return "experience";
   }
-  if (/\b(contact|email|reach|hire|hiring|message him|get in touch)\b/.test(q)) {
+  if (/\b(contact|email|reach|hire|hiring|message him|get in touch|sampark|sampark karo|email bhejo|mail)\b/.test(q)) {
     return "contact";
   }
-  if (/\b(resume|cv|curriculum)\b/.test(q)) {
+  if (/\b(resume|cv|curriculum|biodata)\b/.test(q)) {
     return "resume";
   }
   if (/\b(terminal|cli|shell|console|command line)\b/.test(q)) {
     return "terminal";
   }
   if (
-    /\b(who is|who's|about him|about her|about anurag|introduce|introduction|background)\b/.test(
+    /\b(who is|who's|about him|about her|about anurag|introduce|introduction|background|kaun hai|kon hai|kya karta|kya karti|intro|parichay)\b/.test(
       q,
     ) ||
     /\bwhat does (he|she|they) do\b/.test(q)

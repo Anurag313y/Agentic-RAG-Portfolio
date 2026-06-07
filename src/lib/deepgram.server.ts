@@ -16,14 +16,17 @@ export function normalizeAudioMimeType(mimeType: string): string {
   return "audio/webm";
 }
 
-function mapDeepgramHttpError(status: number, body: string, context: "listen" | "speak" | "grant"): never {
-  let errMsg = "";
+function parseDeepgramErrMsg(body: string): string {
   try {
     const parsed = JSON.parse(body) as { err_msg?: string };
-    errMsg = parsed.err_msg ?? "";
+    return parsed.err_msg ?? "";
   } catch {
-    errMsg = body.slice(0, 200);
+    return body.slice(0, 200);
   }
+}
+
+function mapDeepgramHttpError(status: number, body: string, context: "listen" | "speak" | "grant"): never {
+  const errMsg = parseDeepgramErrMsg(body);
   console.error(`[deepgram] ${context} failed:`, status, body);
 
   if (status === 401 || errMsg.toLowerCase().includes("invalid credentials")) {
@@ -31,6 +34,13 @@ function mapDeepgramHttpError(status: number, body: string, context: "listen" | 
   }
   if (status === 400 && errMsg.toLowerCase().includes("model")) {
     throw new Error("DEEPGRAM_MODEL_INVALID");
+  }
+  if (
+    context === "listen" &&
+    status === 400 &&
+    /corrupt|unsupported data|invalid audio|could not decode/i.test(errMsg)
+  ) {
+    throw new Error("INVALID_AUDIO");
   }
   if (context === "listen") throw new Error("DEEPGRAM_LISTEN_FAILED");
   if (context === "speak") throw new Error("DEEPGRAM_SPEAK_FAILED");
@@ -127,11 +137,57 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
+export type TranscribeOptions = {
+  language?: string;
+  /** Skip smart_format/punctuate for lower STT latency on short voice clips. */
+  fast?: boolean;
+};
+
+const MIN_AUDIO_BYTES = 256;
+
+/** Ordered STT language attempts — avoids unreliable `multi` on pre-recorded API. */
+function listenLanguageCandidates(language?: string): string[] {
+  const primary = language?.trim() || "en";
+  if (primary === "multi") {
+    return ["en", "hi"];
+  }
+  const candidates = [primary];
+  if (primary !== "en") candidates.push("en");
+  if (primary !== "hi") candidates.push("hi");
+  return [...new Set(candidates)];
+}
+
+function decodeAudioPayload(audioBase64: string): Uint8Array {
+  const bytes = base64ToBytes(audioBase64);
+  if (bytes.length < MIN_AUDIO_BYTES) {
+    throw new Error("EMPTY_AUDIO");
+  }
+  return bytes;
+}
+
+function extractTranscript(data: unknown): string {
+  const parsed = data as {
+    results?: { channels?: Array<{ alternatives?: Array<{ transcript?: string }> }> };
+  };
+  return parsed.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? "";
+}
+
+function isNonRetryableListenError(status: number, body: string): boolean {
+  if (status === 401) return true;
+  const errMsg = parseDeepgramErrMsg(body).toLowerCase();
+  if (status === 400 && errMsg.includes("model")) return true;
+  if (status === 400 && /corrupt|unsupported data|invalid audio|could not decode/i.test(errMsg)) {
+    return true;
+  }
+  return false;
+}
+
 export async function transcribeAudio(
   apiKey: string | null | undefined,
   audioBase64: string,
   mimeType: string,
   model: string,
+  options: TranscribeOptions = {},
 ): Promise<string> {
   const key = requireDeepgramKey(apiKey);
   if (!audioBase64.trim()) {
@@ -139,35 +195,61 @@ export async function transcribeAudio(
   }
 
   const sttModel = model.trim() || "nova-3";
-  const params = new URLSearchParams({
-    model: sttModel,
-    smart_format: "true",
-    punctuate: "true",
-    language: "en",
-  });
-
+  const fast = options.fast ?? false;
   const contentType = normalizeAudioMimeType(mimeType);
+  const audioBytes = decodeAudioPayload(audioBase64);
+  const languages = listenLanguageCandidates(options.language);
 
-  const res = await fetch(`${DEEPGRAM_BASE}/v1/listen?${params}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${key}`,
-      "Content-Type": contentType,
-    },
-    body: base64ToBytes(audioBase64).buffer as ArrayBuffer,
-  });
+  let lastStatus = 0;
+  let lastBody = "";
 
-  if (!res.ok) {
-    const body = await res.text();
-    mapDeepgramHttpError(res.status, body, "listen");
+  for (let i = 0; i < languages.length; i++) {
+    const language = languages[i]!;
+    const params = new URLSearchParams({
+      model: sttModel,
+      smart_format: fast ? "false" : "true",
+      punctuate: fast ? "false" : "true",
+      language,
+    });
+
+    const res = await fetch(`${DEEPGRAM_BASE}/v1/listen?${params}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${key}`,
+        "Content-Type": contentType,
+      },
+      body: audioBytes,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const transcript = extractTranscript(data);
+      if (transcript) {
+        return transcript;
+      }
+      if (i < languages.length - 1) {
+        console.warn(`[deepgram] no speech for language=${language}, retrying…`);
+        continue;
+      }
+      throw new Error("NO_SPEECH_DETECTED");
+    }
+
+    lastStatus = res.status;
+    lastBody = await res.text();
+
+    if (isNonRetryableListenError(lastStatus, lastBody)) {
+      mapDeepgramHttpError(lastStatus, lastBody, "listen");
+    }
+
+    if (i < languages.length - 1) {
+      console.warn(
+        `[deepgram] listen failed for language=${language}, retrying…`,
+        lastStatus,
+        lastBody.slice(0, 200),
+      );
+      continue;
+    }
   }
 
-  const data = (await res.json()) as {
-    results?: { channels?: Array<{ alternatives?: Array<{ transcript?: string }> }> };
-  };
-  const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
-  if (!transcript) {
-    throw new Error("NO_SPEECH_DETECTED");
-  }
-  return transcript;
+  mapDeepgramHttpError(lastStatus, lastBody, "listen");
 }
